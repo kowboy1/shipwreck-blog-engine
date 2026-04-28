@@ -1,0 +1,29 @@
+{
+  "name": "@shipwreck/blog-core",
+  "version": "0.1.0",
+  "description": "Core engine for Shipwreck Blog — schema, components, SEO helpers",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas/index.ts",
+    "./seo": "./src/seo/index.ts",
+    "./utils": "./src/utils/index.ts",
+    "./components/*": "./src/components/*"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "astro": "^5.0.0"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

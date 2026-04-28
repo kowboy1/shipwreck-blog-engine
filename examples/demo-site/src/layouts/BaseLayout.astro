@@ -1,0 +1,61 @@
+---
+import "../styles/global.css"
+import type { MetaTags } from "@shipwreck/blog-core"
+import Header from "../components/SiteShell/Header.astro"
+import Footer from "../components/SiteShell/Footer.astro"
+
+interface Props {
+  meta: MetaTags
+  jsonLd?: object | object[]
+}
+
+const { meta, jsonLd } = Astro.props
+const ldArray = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{meta.title}</title>
+    {meta.description && <meta name="description" content={meta.description} />}
+    <link rel="canonical" href={meta.canonical} />
+    <meta name="robots" content={meta.robots} />
+
+    <meta property="og:type" content={meta.og.type} />
+    <meta property="og:title" content={meta.og.title} />
+    {meta.og.description && <meta property="og:description" content={meta.og.description} />}
+    {meta.og.image && <meta property="og:image" content={meta.og.image} />}
+    <meta property="og:url" content={meta.og.url} />
+    <meta property="og:site_name" content={meta.og.siteName} />
+    <meta property="og:locale" content={meta.og.locale} />
+
+    <meta name="twitter:card" content={meta.twitter.card} />
+    <meta name="twitter:title" content={meta.twitter.title} />
+    {meta.twitter.description && <meta name="twitter:description" content={meta.twitter.description} />}
+    {meta.twitter.image && <meta name="twitter:image" content={meta.twitter.image} />}
+    {meta.twitter.site && <meta name="twitter:site" content={meta.twitter.site} />}
+
+    {meta.article && (
+      <>
+        <meta property="article:published_time" content={meta.article.publishedTime} />
+        <meta property="article:modified_time" content={meta.article.modifiedTime} />
+        {meta.article.author && <meta property="article:author" content={meta.article.author} />}
+        {meta.article.section && <meta property="article:section" content={meta.article.section} />}
+        {meta.article.tags?.map((tag) => <meta property="article:tag" content={tag} />)}
+      </>
+    )}
+
+    {ldArray.map((ld) => (
+      <script type="application/ld+json" set:html={JSON.stringify(ld)} />
+    ))}
+  </head>
+  <body>
+    <Header />
+    <main class="mx-auto max-w-3xl px-4 py-10">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

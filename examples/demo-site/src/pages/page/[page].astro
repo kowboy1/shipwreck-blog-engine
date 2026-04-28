@@ -1,0 +1,51 @@
+---
+import { getCollection } from "astro:content"
+import { buildPostMeta, organizationSchema } from "@shipwreck/blog-core"
+import PostCard from "@shipwreck/blog-core/components/PostCard.astro"
+import Pagination from "@shipwreck/blog-core/components/Pagination.astro"
+import BaseLayout from "../../layouts/BaseLayout.astro"
+import siteConfig from "../../../site.config"
+
+export async function getStaticPaths() {
+  const all = await getCollection("posts", ({ data }) => data.status === "published")
+  const sorted = all.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf())
+  const perPage = siteConfig.layout.postsPerPage
+  const total = Math.max(1, Math.ceil(sorted.length / perPage))
+  return Array.from({ length: total }, (_, i) => i + 1)
+    .filter((n) => n > 1)
+    .map((n) => ({
+      params: { page: String(n) },
+      props: {
+        page: n,
+        total,
+        posts: sorted.slice((n - 1) * perPage, n * perPage),
+      },
+    }))
+}
+
+const { page, total, posts } = Astro.props
+const url = new URL(`${siteConfig.blogBasePath}/page/${page}/`, siteConfig.baseUrl).toString()
+const meta = buildPostMeta({
+  post: {
+    title: `${siteConfig.siteName} — Blog (page ${page})`,
+    metaDescription: `Latest posts from ${siteConfig.siteName}, page ${page}`,
+    publishDate: new Date(),
+    status: "published",
+    tags: [],
+    noindex: false,
+    featured: false,
+    sticky: false,
+    articleType: "BlogPosting",
+  },
+  siteConfig,
+  url,
+})
+---
+
+<BaseLayout meta={{ ...meta, og: { ...meta.og, type: "website" } }} jsonLd={organizationSchema(siteConfig)}>
+  <h1 class="font-heading text-4xl font-bold text-primary">Blog — page {page}</h1>
+  <div class="mt-8 space-y-6">
+    {posts.map((post) => <PostCard post={post} basePath={siteConfig.blogBasePath} />)}
+  </div>
+  <Pagination current={page} total={total} basePath={siteConfig.blogBasePath} />
+</BaseLayout>

@@ -1,0 +1,24 @@
+---
+// Sveltia CMS admin page — served at /blog/admin/.
+//
+// Sveltia loads its config from ./config.yml (same directory). That file lives
+// in public/admin/config.yml so Astro serves it as a static asset alongside
+// this rendered page.
+//
+// Edit public/admin/config.yml to point Sveltia at your site's GitHub repo.
+// See INTEGRATION.md → "Enable the CMS" for OAuth setup.
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Content Manager</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <script src="https://unpkg.com/@sveltia/cms/dist/sveltia-cms.js" is:inline></script>
+  </body>
+</html>

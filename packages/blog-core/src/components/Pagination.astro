@@ -1,0 +1,46 @@
+---
+interface Props {
+  current: number
+  total: number
+  basePath: string
+}
+
+const { current, total, basePath } = Astro.props
+const base = basePath.replace(/\/$/, "")
+
+function pageUrl(n: number): string {
+  return n === 1 ? `${base}/` : `${base}/page/${n}/`
+}
+
+const pages = Array.from({ length: total }, (_, i) => i + 1)
+---
+
+{total > 1 && (
+  <nav aria-label="Pagination" class="mt-10 flex items-center justify-between border-t border-border pt-6 text-sm">
+    <div>
+      {current > 1 ? (
+        <a href={pageUrl(current - 1)} class="text-accent hover:underline">← Previous</a>
+      ) : (
+        <span class="text-muted">← Previous</span>
+      )}
+    </div>
+    <ol class="flex gap-2">
+      {pages.map((p) => (
+        <li>
+          {p === current ? (
+            <span aria-current="page" class="rounded-card bg-primary px-3 py-1 text-bg">{p}</span>
+          ) : (
+            <a href={pageUrl(p)} class="rounded-card border border-border px-3 py-1 hover:border-accent hover:text-accent">{p}</a>
+          )}
+        </li>
+      ))}
+    </ol>
+    <div>
+      {current < total ? (
+        <a href={pageUrl(current + 1)} class="text-accent hover:underline">Next →</a>
+      ) : (
+        <span class="text-muted">Next →</span>
+      )}
+    </div>
+  </nav>
+)}

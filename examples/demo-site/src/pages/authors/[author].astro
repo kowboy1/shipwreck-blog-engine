@@ -1,0 +1,67 @@
+---
+import { getCollection, getEntry } from "astro:content"
+import { buildPostMeta, breadcrumbSchema } from "@shipwreck/blog-core"
+import PostCard from "@shipwreck/blog-core/components/PostCard.astro"
+import Breadcrumbs from "@shipwreck/blog-core/components/Breadcrumbs.astro"
+import AuthorBio from "@shipwreck/blog-core/components/AuthorBio.astro"
+import BaseLayout from "../../layouts/BaseLayout.astro"
+import siteConfig from "../../../site.config"
+
+export async function getStaticPaths() {
+  const posts = await getCollection("posts", ({ data }) => data.status === "published")
+  const authorIds = new Set<string>()
+  for (const p of posts) if (p.data.author) authorIds.add(p.data.author)
+  return Array.from(authorIds).map((authorId) => ({
+    params: { author: authorId },
+    props: {
+      authorId,
+      posts: posts
+        .filter((p) => p.data.author === authorId)
+        .sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf()),
+    },
+  }))
+}
+
+const { authorId, posts } = Astro.props
+const authorEntry = await getEntry("authors", authorId)
+const author = authorEntry?.data
+
+const url = new URL(`${siteConfig.blogBasePath}/authors/${authorId}/`, siteConfig.baseUrl).toString()
+const blogUrl = new URL(siteConfig.blogBasePath, siteConfig.baseUrl).toString()
+const displayName = author?.name ?? authorId
+
+const meta = buildPostMeta({
+  post: {
+    title: `${displayName} — ${siteConfig.siteName}`,
+    metaDescription: `Posts by ${displayName} on ${siteConfig.siteName}`,
+    publishDate: new Date(),
+    status: "published",
+    tags: [],
+    noindex: false,
+    featured: false,
+    sticky: false,
+    articleType: "BlogPosting",
+  },
+  siteConfig,
+  url,
+})
+
+const crumbs = [
+  { name: "Home", url: siteConfig.baseUrl },
+  { name: "Blog", url: blogUrl },
+  { name: displayName },
+]
+---
+
+<BaseLayout
+  meta={{ ...meta, og: { ...meta.og, type: "website" } }}
+  jsonLd={breadcrumbSchema(crumbs.map((c) => ({ name: c.name, url: c.url ?? url })))}
+>
+  <Breadcrumbs items={crumbs} />
+  <h1 class="mt-4 font-heading text-4xl font-bold text-primary">{displayName}</h1>
+  {author && <AuthorBio author={author} />}
+  <h2 class="mt-10 font-heading text-2xl font-semibold text-primary">Posts</h2>
+  <div class="mt-4 space-y-6">
+    {posts.map((post) => <PostCard post={post} basePath={siteConfig.blogBasePath} />)}
+  </div>
+</BaseLayout>

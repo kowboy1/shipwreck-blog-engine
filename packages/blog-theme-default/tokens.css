@@ -1,0 +1,13 @@
+:root {
+  --color-primary: #0f172a;
+  --color-accent: #2563eb;
+  --color-bg: #ffffff;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
+
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --font-heading: var(--font-sans);
+
+  --radius-card: 0.75rem;
+}

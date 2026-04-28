@@ -1,0 +1,29 @@
+{
+  "name": "@shipwreck/blog-demo-site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "@shipwreck/blog-core": "*",
+    "@shipwreck/blog-theme-default": "*",
+    "@astrojs/mdx": "^4.0.0",
+    "@astrojs/rss": "^4.0.0",
+    "@astrojs/sitemap": "^3.2.0",
+    "@astrojs/tailwind": "^5.1.0",
+    "@tailwindcss/typography": "^0.5.15",
+    "astro": "^5.0.0",
+    "mdast-util-to-string": "^4.0.0",
+    "tailwindcss": "^3.4.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.0",
+    "typescript": "^5.6.0"
+  }
+}

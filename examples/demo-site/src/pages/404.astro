@@ -1,0 +1,30 @@
+---
+import { buildPostMeta } from "@shipwreck/blog-core"
+import BaseLayout from "../layouts/BaseLayout.astro"
+import siteConfig from "../../site.config"
+
+const url = new URL(`${siteConfig.blogBasePath}/404/`, siteConfig.baseUrl).toString()
+const meta = buildPostMeta({
+  post: {
+    title: "Page not found",
+    metaDescription: "The page you're looking for doesn't exist.",
+    publishDate: new Date(),
+    status: "published",
+    tags: [],
+    noindex: true,
+    featured: false,
+    sticky: false,
+    articleType: "BlogPosting",
+  },
+  siteConfig,
+  url,
+})
+---
+
+<BaseLayout meta={{ ...meta, og: { ...meta.og, type: "website" } }}>
+  <h1 class="font-heading text-5xl font-bold text-primary">404</h1>
+  <p class="mt-4 text-lg text-muted">This page doesn't exist or has moved.</p>
+  <a href={siteConfig.blogBasePath} class="mt-8 inline-block rounded-card bg-accent px-5 py-2 font-medium text-bg hover:opacity-90">
+    Back to the blog
+  </a>
+</BaseLayout>

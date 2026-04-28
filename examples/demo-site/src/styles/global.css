@@ -1,0 +1,20 @@
+@import "@shipwreck/blog-theme-default/tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+}
+
+.prose a {
+  color: var(--color-accent);
+  text-decoration: underline;
+}

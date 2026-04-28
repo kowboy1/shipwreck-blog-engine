@@ -1,0 +1,21 @@
+---
+import type { Post } from "../schemas/post.js"
+import PostCard from "./PostCard.astro"
+
+interface Props {
+  posts: Array<{ id: string; data: Post }>
+  basePath: string
+  title?: string
+}
+
+const { posts, basePath, title = "Related posts" } = Astro.props
+---
+
+{posts.length > 0 && (
+  <section class="mt-12 border-t border-border pt-8">
+    <h2 class="mb-6 font-heading text-2xl font-semibold text-primary">{title}</h2>
+    <div class="space-y-6">
+      {posts.map((post) => <PostCard post={post} basePath={basePath} />)}
+    </div>
+  </section>
+)}

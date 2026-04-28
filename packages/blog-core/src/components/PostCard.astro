@@ -1,0 +1,35 @@
+---
+import type { Post } from "../schemas/post.js"
+
+interface Props {
+  post: { id: string; data: Post }
+  basePath: string
+}
+
+const { post, basePath } = Astro.props
+const href = `${basePath.replace(/\/$/, "")}/${post.id}/`
+---
+
+<article class="border-b border-border pb-6 last:border-b-0">
+  <a href={href} class="group block">
+    {post.data.featuredImage && (
+      <img
+        src={post.data.featuredImage}
+        alt={post.data.featuredImageAlt ?? post.data.title}
+        class="mb-3 aspect-[16/9] w-full rounded-card object-cover"
+        loading="lazy"
+      />
+    )}
+    <h2 class="font-heading text-2xl font-semibold text-primary group-hover:text-accent">
+      {post.data.title}
+    </h2>
+    {post.data.excerpt && <p class="mt-2 text-muted">{post.data.excerpt}</p>}
+    <p class="mt-2 text-sm text-muted">
+      <time datetime={post.data.publishDate.toISOString()}>
+        {post.data.publishDate.toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric" })}
+      </time>
+      {post.data.author && <> · {post.data.author}</>}
+      {post.data.category && <> · {post.data.category}</>}
+    </p>
+  </a>
+</article>

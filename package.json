@@ -1,0 +1,19 @@
+{
+  "name": "shipwreck-blog-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Drop-in SEO-first blog engine for Shipwreck sites",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w examples/demo-site",
+    "build": "npm run build --workspaces --if-present",
+    "build:demo": "npm run build -w examples/demo-site",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

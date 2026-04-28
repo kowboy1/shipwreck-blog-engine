@@ -1,0 +1,29 @@
+---
+import type { SiteConfig } from "../schemas/site-config.js"
+
+interface Props {
+  siteConfig: SiteConfig
+  category?: string
+  postOverride?: string
+  registry: Record<string, any>
+}
+
+const { siteConfig, category, postOverride, registry } = Astro.props
+
+function pickKey(): string | undefined {
+  if (postOverride) return postOverride
+  if (category && siteConfig.ctaBlocks?.categoryOverrides?.[category]) {
+    return siteConfig.ctaBlocks.categoryOverrides[category]
+  }
+  return siteConfig.ctaBlocks?.default
+}
+
+const key = pickKey()
+const Component = key ? registry[key] : undefined
+---
+
+{Component && (
+  <div class="my-10">
+    <Component />
+  </div>
+)}

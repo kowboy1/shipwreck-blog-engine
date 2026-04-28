@@ -1,0 +1,12 @@
+---
+// SiteShell/Footer.astro
+// Replace this with the host site's footer markup when theming.
+import siteConfig from "../../../site.config"
+const year = new Date().getFullYear()
+---
+
+<footer class="mt-16 border-t border-border bg-bg">
+  <div class="mx-auto max-w-5xl px-4 py-8 text-sm text-muted">
+    &copy; {year} {siteConfig.brand.organizationName}. All rights reserved.
+  </div>
+</footer>

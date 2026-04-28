@@ -1,0 +1,16 @@
+{
+  "name": "@shipwreck/blog-theme-default",
+  "version": "0.1.0",
+  "description": "Default Tailwind preset and theme tokens for Shipwreck Blog",
+  "type": "module",
+  "main": "./tailwind-preset.js",
+  "exports": {
+    ".": "./tailwind-preset.js",
+    "./tailwind-preset": "./tailwind-preset.js",
+    "./tokens.css": "./tokens.css"
+  },
+  "files": [
+    "tailwind-preset.js",
+    "tokens.css"
+  ]
+}

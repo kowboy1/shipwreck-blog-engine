@@ -1,0 +1,19 @@
+{
+  "name": "create-shipwreck-blog",
+  "version": "0.1.0",
+  "description": "Scaffold a Shipwreck blog into an existing site",
+  "type": "module",
+  "bin": {
+    "create-shipwreck-blog": "./bin/create.mjs"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "dependencies": {
+    "prompts": "^2.4.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

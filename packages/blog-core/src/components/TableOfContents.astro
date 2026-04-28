@@ -1,0 +1,26 @@
+---
+import type { MarkdownHeading } from "astro"
+
+interface Props {
+  headings: MarkdownHeading[]
+  minDepth?: number
+  maxDepth?: number
+  title?: string
+}
+
+const { headings, minDepth = 2, maxDepth = 3, title = "On this page" } = Astro.props
+const filtered = headings.filter((h) => h.depth >= minDepth && h.depth <= maxDepth)
+---
+
+{filtered.length > 0 && (
+  <aside class="rounded-card border border-border bg-bg p-4 text-sm">
+    <p class="mb-2 font-semibold text-primary">{title}</p>
+    <ol class="space-y-1">
+      {filtered.map((h) => (
+        <li class={`pl-${(h.depth - minDepth) * 4}`}>
+          <a href={`#${h.slug}`} class="text-muted hover:text-accent">{h.text}</a>
+        </li>
+      ))}
+    </ol>
+  </aside>
+)}

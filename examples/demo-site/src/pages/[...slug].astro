@@ -1,0 +1,107 @@
+---
+import { getCollection, getEntry, render } from "astro:content"
+import {
+  buildPostMeta,
+  articleSchema,
+  breadcrumbSchema,
+  faqSchema,
+  rankRelatedPosts,
+  readingTimeLabel,
+} from "@shipwreck/blog-core"
+import Breadcrumbs from "@shipwreck/blog-core/components/Breadcrumbs.astro"
+import TableOfContents from "@shipwreck/blog-core/components/TableOfContents.astro"
+import RelatedPosts from "@shipwreck/blog-core/components/RelatedPosts.astro"
+import AuthorBio from "@shipwreck/blog-core/components/AuthorBio.astro"
+import TagList from "@shipwreck/blog-core/components/TagList.astro"
+import CTABlock from "@shipwreck/blog-core/components/CTABlock.astro"
+import BaseLayout from "../layouts/BaseLayout.astro"
+import siteConfig from "../../site.config"
+import { ctaRegistry } from "../components/cta/registry"
+
+export async function getStaticPaths() {
+  const posts = await getCollection("posts", ({ data }) => data.status === "published")
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post, all: posts } }))
+}
+
+const { post, all } = Astro.props
+const { Content, headings, remarkPluginFrontmatter } = await render(post)
+
+const url = new URL(`${siteConfig.blogBasePath}/${post.id}/`, siteConfig.baseUrl).toString()
+const blogUrl = new URL(siteConfig.blogBasePath, siteConfig.baseUrl).toString()
+const meta = buildPostMeta({ post: post.data, siteConfig, url })
+
+const authorEntry = post.data.author ? await getEntry("authors", post.data.author) : undefined
+const author = authorEntry?.data
+
+const jsonLd: object[] = [
+  articleSchema({
+    post: post.data,
+    siteConfig,
+    url,
+    authorName: author?.name ?? post.data.author,
+    authorUrl: author?.url,
+  }),
+  breadcrumbSchema([
+    { name: "Home", url: siteConfig.baseUrl },
+    { name: "Blog", url: blogUrl },
+    { name: post.data.title, url },
+  ]),
+]
+
+if (post.data.faqItems && post.data.faqItems.length > 0) {
+  jsonLd.push(faqSchema(post.data.faqItems))
+}
+
+const related = siteConfig.layout.showRelatedPosts
+  ? rankRelatedPosts({
+      current: post,
+      candidates: all,
+      limit: siteConfig.layout.relatedPostsCount,
+    })
+  : []
+
+const crumbs = [
+  { name: "Home", url: siteConfig.baseUrl },
+  { name: "Blog", url: blogUrl },
+  { name: post.data.title },
+]
+
+const wordCount = (remarkPluginFrontmatter as { wordCount?: number } | undefined)?.wordCount
+const readingLabel = wordCount ? readingTimeLabel("x ".repeat(wordCount)) : undefined
+---
+
+<BaseLayout meta={meta} jsonLd={jsonLd}>
+  <Breadcrumbs items={crumbs} />
+
+  <article class="prose prose-lg mt-6 max-w-none">
+    <header class="not-prose mb-8">
+      <h1 class="font-heading text-4xl font-bold text-primary">{post.data.title}</h1>
+      {post.data.excerpt && <p class="mt-3 text-lg text-muted">{post.data.excerpt}</p>}
+      <p class="mt-4 text-sm text-muted">
+        <time datetime={post.data.publishDate.toISOString()}>
+          {post.data.publishDate.toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric" })}
+        </time>
+        {siteConfig.layout.showAuthor && author && <> · {author.name}</>}
+        {siteConfig.layout.showReadingTime && readingLabel && <> · {readingLabel}</>}
+      </p>
+    </header>
+
+    {siteConfig.layout.showTableOfContents && <TableOfContents headings={headings} />}
+
+    <div class="mt-8">
+      <Content />
+    </div>
+
+    {post.data.tags && post.data.tags.length > 0 && (
+      <div class="not-prose mt-10">
+        <TagList tags={post.data.tags} basePath={siteConfig.blogBasePath} />
+      </div>
+    )}
+
+    <CTABlock siteConfig={siteConfig} category={post.data.category} postOverride={post.data.ctaBlock} registry={ctaRegistry} />
+
+    {author && <AuthorBio author={author} />}
+
+    <RelatedPosts posts={related} basePath={siteConfig.blogBasePath} />
+  </article>
+</BaseLayout>

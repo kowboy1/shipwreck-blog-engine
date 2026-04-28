@@ -1,0 +1,122 @@
+# Sveltia CMS configuration
+#
+# IMPORTANT: Replace the placeholders before this admin page will work.
+#   1. backend.repo  → "GITHUB_ORG/SITE_REPO" containing the blog
+#   2. backend.branch → main branch of that repo (usually "main")
+#   3. Re-deploy the site
+#
+# See INTEGRATION.md → "Enable the CMS" for the OAuth setup.
+
+backend:
+  name: github
+  repo: GITHUB_ORG/SITE_REPO
+  branch: main
+  # Sveltia uses GitHub's PKCE OAuth flow by default. No custom backend needed
+  # for the github backend in modern Sveltia. If you need a custom auth proxy,
+  # set base_url and auth_endpoint here.
+
+# Where Sveltia uploads images. Path is relative to the site repo root.
+media_folder: "public/uploads"
+public_folder: "/uploads"
+
+# Make commits look like Nyxi/agents instead of "GitHub User"
+commit_messages:
+  create: 'content(blog): create {{collection}} "{{slug}}"'
+  update: 'content(blog): update {{collection}} "{{slug}}"'
+  delete: 'content(blog): delete {{collection}} "{{slug}}"'
+  uploadMedia: 'content(blog): upload {{path}}'
+  deleteMedia: 'content(blog): delete {{path}}'
+
+site_url: https://example.com/blog
+display_url: https://example.com/blog
+
+collections:
+  - name: posts
+    label: Posts
+    label_singular: Post
+    description: "Blog posts. Frontmatter is validated by Zod at build — fields here mirror that schema."
+    folder: "src/content/posts"
+    create: true
+    extension: mdx
+    format: frontmatter
+    slug: "{{slug}}"
+    summary: "{{title}} — {{publishDate | date('YYYY-MM-DD')}}"
+    sortable_fields: [publishDate, title, updatedDate]
+    view_filters:
+      - label: Published
+        field: status
+        pattern: published
+      - label: Drafts
+        field: status
+        pattern: draft
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Excerpt", name: "excerpt", widget: "text", required: false, hint: "Short summary, ~160 chars. Used on cards and as a fallback meta description." }
+      - { label: "Publish date", name: "publishDate", widget: "datetime", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Updated date", name: "updatedDate", widget: "datetime", date_format: "YYYY-MM-DD", time_format: false, required: false }
+      - { label: "Status", name: "status", widget: "select", options: ["published", "draft", "scheduled"], default: "published" }
+      - { label: "Author", name: "author", widget: "relation", collection: "authors", search_fields: ["name"], value_field: "{{slug}}", display_fields: ["name"], required: false }
+      - { label: "Category", name: "category", widget: "string", required: false, hint: "Single category slug (lowercase). Drives the category archive page and CTA overrides." }
+      - { label: "Tags", name: "tags", widget: "list", required: false, default: [] }
+      - { label: "Featured image", name: "featuredImage", widget: "image", required: false }
+      - { label: "Featured image alt text", name: "featuredImageAlt", widget: "string", required: false }
+
+      - label: "SEO"
+        name: "seo_section"
+        widget: "object"
+        collapsed: true
+        required: false
+        fields:
+          - { label: "Meta title", name: "metaTitle", widget: "string", required: false, hint: "Override the <title> tag. Defaults to post title." }
+          - { label: "Meta description", name: "metaDescription", widget: "text", required: false, hint: "~155 chars." }
+          - { label: "Canonical URL", name: "canonical", widget: "string", required: false }
+          - { label: "No-index", name: "noindex", widget: "boolean", default: false }
+          - { label: "Article type (schema.org)", name: "articleType", widget: "select", options: ["BlogPosting", "Article", "NewsArticle", "TechArticle"], default: "BlogPosting" }
+
+      - label: "Open Graph / social"
+        name: "og_section"
+        widget: "object"
+        collapsed: true
+        required: false
+        fields:
+          - { label: "OG title", name: "ogTitle", widget: "string", required: false }
+          - { label: "OG description", name: "ogDescription", widget: "text", required: false }
+          - { label: "OG image", name: "ogImage", widget: "image", required: false }
+
+      - label: "FAQ items (adds FAQPage schema)"
+        name: "faqItems"
+        widget: "list"
+        required: false
+        collapsed: true
+        fields:
+          - { label: "Question", name: "question", widget: "string" }
+          - { label: "Answer", name: "answer", widget: "text" }
+
+      - { label: "Related posts (manual)", name: "relatedPosts", widget: "relation", collection: "posts", multiple: true, search_fields: ["title"], value_field: "{{slug}}", display_fields: ["title"], required: false, hint: "Override the auto-suggested related posts." }
+      - { label: "CTA block override", name: "ctaBlock", widget: "string", required: false, hint: "Optional. Key from the site's CTA registry. Overrides category default." }
+
+      - { label: "Featured", name: "featured", widget: "boolean", default: false }
+      - { label: "Sticky", name: "sticky", widget: "boolean", default: false }
+
+      - { label: "Body", name: "body", widget: "markdown", hint: "Supports MDX — you can include components if the site registers them." }
+
+  - name: authors
+    label: Authors
+    label_singular: Author
+    folder: "src/content/authors"
+    create: true
+    extension: json
+    format: json
+    slug: "{{slug}}"
+    summary: "{{name}}"
+    fields:
+      - { label: "Name", name: "name", widget: "string" }
+      - { label: "Bio", name: "bio", widget: "text", required: false }
+      - { label: "Avatar", name: "avatar", widget: "image", required: false }
+      - { label: "Website", name: "url", widget: "string", required: false }
+      - { label: "Twitter", name: "twitter", widget: "string", required: false }
+      - { label: "LinkedIn", name: "linkedin", widget: "string", required: false }
+      - { label: "Email", name: "email", widget: "string", required: false }
+
+# Redirects are edited as plain JSON at src/redirects.json — kept out of
+# the CMS to preserve a flat array format. Use GitHub's web editor or a PR.
