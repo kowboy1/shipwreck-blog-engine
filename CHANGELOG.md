@@ -4,6 +4,28 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-28
+
+### Added
+- `<ArticleLayout>` component — three-column grid (ToC sidebar / main / featured sidebar) with mobile collapse
+- `<FeaturedPosts>` component — sticky sidebar list of featured (or recent) posts with thumbnails, falls back to `siteConfig.seo.defaultFeaturedImage` when a post has no featured image
+- `authors: string[]` field on `postSchema` for multi-author posts. Legacy `author: string` still supported via `getPostAuthorIds()` helper
+- `getPostAuthorIds()` exported from `@shipwreck/blog-core/utils` — normalizes single/multi author into a flat list
+- `seo.defaultFeaturedImage` on `siteConfigSchema` — used as fallback for PostCard, FeaturedPosts, and the post hero image
+- `defaultImage` prop on `<PostCard>` and `<FeaturedPosts>` for fallback images
+- `articleSchema()` now accepts an `authors[]` array (also keeps legacy `authorName`/`authorUrl` for backward compat) and emits an array of Person entities for multi-author posts
+- Hero featured image rendered above the article body when `featuredImage` (or site default) is set
+- Sveltia CMS config updated: `author` field is now an `authors` relation widget with `multiple: true`
+
+### Changed
+- `<TableOfContents>` default `maxDepth` is now 4 (was 3); added `sticky` prop for desktop sticky positioning
+- Post page (`[...slug].astro`) restructured to use `<ArticleLayout>` with sidebar ToC + featured posts
+- Author archive page (`/authors/<id>/`) now lists posts where author appears in either the legacy `author` field or the new `authors[]` array
+- Multi-author posts render byline as "Author A & Author B" with each name linking to their URL
+
+### Fixed
+- (none)
+
 ## [0.1.0] - 2026-04-28
 
 ### Added

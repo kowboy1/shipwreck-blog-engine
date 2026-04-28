@@ -14,6 +14,7 @@ export const siteConfigSchema = z.object({
 
   seo: z.object({
     defaultOgImage: z.string().optional(),
+    defaultFeaturedImage: z.string().optional(),
     twitterHandle: z.string().optional(),
     locale: z.string().default("en_AU"),
   }),

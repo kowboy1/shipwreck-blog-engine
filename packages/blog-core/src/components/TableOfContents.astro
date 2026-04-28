@@ -6,21 +6,49 @@ interface Props {
   minDepth?: number
   maxDepth?: number
   title?: string
+  sticky?: boolean
 }
 
-const { headings, minDepth = 2, maxDepth = 3, title = "On this page" } = Astro.props
+const {
+  headings,
+  minDepth = 2,
+  maxDepth = 4,
+  title = "On this page",
+  sticky = false,
+} = Astro.props
+
 const filtered = headings.filter((h) => h.depth >= minDepth && h.depth <= maxDepth)
+
+const indentByDepth: Record<number, string> = {
+  1: "pl-0",
+  2: "pl-0",
+  3: "pl-4",
+  4: "pl-8",
+  5: "pl-12",
+  6: "pl-16",
+}
 ---
 
 {filtered.length > 0 && (
-  <aside class="rounded-card border border-border bg-bg p-4 text-sm">
-    <p class="mb-2 font-semibold text-primary">{title}</p>
-    <ol class="space-y-1">
+  <nav
+    aria-label="Table of contents"
+    class:list={[
+      "rounded-card border border-border bg-bg/60 p-5 text-sm backdrop-blur",
+      sticky && "lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto",
+    ]}
+  >
+    <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">{title}</p>
+    <ol class="space-y-1.5">
       {filtered.map((h) => (
-        <li class={`pl-${(h.depth - minDepth) * 4}`}>
-          <a href={`#${h.slug}`} class="text-muted hover:text-accent">{h.text}</a>
+        <li class={indentByDepth[h.depth] ?? "pl-0"}>
+          <a
+            href={`#${h.slug}`}
+            class="block py-0.5 text-muted transition-colors hover:text-accent"
+          >
+            {h.text}
+          </a>
         </li>
       ))}
     </ol>
-  </aside>
+  </nav>
 )}

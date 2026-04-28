@@ -30,6 +30,7 @@ export const postSchema = z.object({
   status: postStatus.default("published"),
 
   author: z.string().optional(),
+  authors: z.array(z.string()).optional(),
   category: z.string().optional(),
   tags: z.array(z.string()).default([]),
 

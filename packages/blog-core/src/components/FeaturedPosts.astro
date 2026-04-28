@@ -1,0 +1,70 @@
+---
+import type { Post } from "../schemas/post.js"
+
+interface Props {
+  posts: Array<{ id: string; data: Post }>
+  basePath: string
+  title?: string
+  defaultImage?: string
+  sticky?: boolean
+  limit?: number
+}
+
+const {
+  posts,
+  basePath,
+  title = "Featured articles",
+  defaultImage,
+  sticky = false,
+  limit = 5,
+} = Astro.props
+
+const base = basePath.replace(/\/$/, "")
+const items = posts.slice(0, limit)
+---
+
+{items.length > 0 && (
+  <aside
+    aria-label={title}
+    class:list={[
+      "rounded-card border border-border bg-bg/60 p-5 backdrop-blur",
+      sticky && "lg:sticky lg:top-24",
+    ]}
+  >
+    <p class="mb-4 text-xs font-semibold uppercase tracking-wider text-muted">{title}</p>
+    <ul class="space-y-4">
+      {items.map((post) => {
+        const image = post.data.featuredImage ?? defaultImage
+        const href = `${base}/${post.id}/`
+        return (
+          <li>
+            <a href={href} class="group flex gap-3">
+              {image && (
+                <img
+                  src={image}
+                  alt={post.data.featuredImageAlt ?? ""}
+                  class="h-16 w-16 flex-none rounded-xl object-cover"
+                  loading="lazy"
+                />
+              )}
+              <div class="min-w-0 flex-1">
+                <p class="line-clamp-2 text-sm font-semibold leading-snug text-primary group-hover:text-accent">
+                  {post.data.title}
+                </p>
+                <p class="mt-1 text-xs text-muted">
+                  <time datetime={post.data.publishDate.toISOString()}>
+                    {post.data.publishDate.toLocaleDateString("en-AU", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </time>
+                </p>
+              </div>
+            </a>
+          </li>
+        )
+      })}
+    </ul>
+  </aside>
+)}

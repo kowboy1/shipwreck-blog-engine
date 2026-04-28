@@ -19,7 +19,8 @@ Everything else is optional.
 | `body` | string | — | Set automatically from MDX content. Don't set in frontmatter |
 | `updatedDate` | date | — | When set, shown alongside publishDate. Used in `dateModified` schema |
 | `status` | enum | `"published"` | One of `"draft" \| "published" \| "scheduled"`. Drafts don't appear in listings or sitemap |
-| `author` | string | — | ID of an author file (filename of `_blog/src/content/authors/<id>.json`) |
+| `author` | string | — | Single author. Legacy field — use `authors` for new content. ID of an author file in `_blog/src/content/authors/<id>.json` |
+| `authors` | string[] | — | One or more authors. Wins over `author` if both set. List of author IDs |
 | `category` | string | — | Single category slug. Drives the category archive page and CTA category overrides |
 | `tags` | string[] | `[]` | List of tag slugs. Drives tag archive pages |
 

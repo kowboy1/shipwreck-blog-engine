@@ -1,6 +1,6 @@
 ---
 import { getCollection, getEntry } from "astro:content"
-import { buildPostMeta, breadcrumbSchema } from "@shipwreck/blog-core"
+import { buildPostMeta, breadcrumbSchema, getPostAuthorIds } from "@shipwreck/blog-core"
 import PostCard from "@shipwreck/blog-core/components/PostCard.astro"
 import Breadcrumbs from "@shipwreck/blog-core/components/Breadcrumbs.astro"
 import AuthorBio from "@shipwreck/blog-core/components/AuthorBio.astro"
@@ -10,13 +10,13 @@ import siteConfig from "../../../site.config"
 export async function getStaticPaths() {
   const posts = await getCollection("posts", ({ data }) => data.status === "published")
   const authorIds = new Set<string>()
-  for (const p of posts) if (p.data.author) authorIds.add(p.data.author)
+  for (const p of posts) for (const id of getPostAuthorIds(p.data)) authorIds.add(id)
   return Array.from(authorIds).map((authorId) => ({
     params: { author: authorId },
     props: {
       authorId,
       posts: posts
-        .filter((p) => p.data.author === authorId)
+        .filter((p) => getPostAuthorIds(p.data).includes(authorId))
         .sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf()),
     },
   }))

@@ -7,10 +7,14 @@ import {
   faqSchema,
   rankRelatedPosts,
   readingTimeLabel,
+  getPostAuthorIds,
+  type ArticleAuthor,
 } from "@shipwreck/blog-core"
+import ArticleLayout from "@shipwreck/blog-core/components/ArticleLayout.astro"
 import Breadcrumbs from "@shipwreck/blog-core/components/Breadcrumbs.astro"
 import TableOfContents from "@shipwreck/blog-core/components/TableOfContents.astro"
 import RelatedPosts from "@shipwreck/blog-core/components/RelatedPosts.astro"
+import FeaturedPosts from "@shipwreck/blog-core/components/FeaturedPosts.astro"
 import AuthorBio from "@shipwreck/blog-core/components/AuthorBio.astro"
 import TagList from "@shipwreck/blog-core/components/TagList.astro"
 import CTABlock from "@shipwreck/blog-core/components/CTABlock.astro"
@@ -30,17 +34,18 @@ const url = new URL(`${siteConfig.blogBasePath}/${post.id}/`, siteConfig.baseUrl
 const blogUrl = new URL(siteConfig.blogBasePath, siteConfig.baseUrl).toString()
 const meta = buildPostMeta({ post: post.data, siteConfig, url })
 
-const authorEntry = post.data.author ? await getEntry("authors", post.data.author) : undefined
-const author = authorEntry?.data
+// Resolve all authors (handles legacy `author: string` and new `authors: string[]`)
+const authorIds = getPostAuthorIds(post.data)
+const authorEntries = await Promise.all(authorIds.map((id) => getEntry("authors", id)))
+const authors = authorEntries.filter((e): e is NonNullable<typeof e> => Boolean(e)).map((e) => e.data)
+
+const articleAuthors: ArticleAuthor[] = authors.map((a) => ({
+  name: a.name,
+  ...(a.url ? { url: a.url } : {}),
+}))
 
 const jsonLd: object[] = [
-  articleSchema({
-    post: post.data,
-    siteConfig,
-    url,
-    authorName: author?.name ?? post.data.author,
-    authorUrl: author?.url,
-  }),
+  articleSchema({ post: post.data, siteConfig, url, authors: articleAuthors }),
   breadcrumbSchema([
     { name: "Home", url: siteConfig.baseUrl },
     { name: "Blog", url: blogUrl },
@@ -60,6 +65,14 @@ const related = siteConfig.layout.showRelatedPosts
     })
   : []
 
+// Featured posts for sidebar — exclude the current post, prefer featured: true,
+// fall back to recent posts so the sidebar isn't empty on a fresh site.
+const featuredCandidates = all
+  .filter((p) => p.id !== post.id && p.data.status === "published")
+  .sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf())
+const featured = featuredCandidates.filter((p) => p.data.featured)
+const featuredForSidebar = (featured.length > 0 ? featured : featuredCandidates).slice(0, 4)
+
 const crumbs = [
   { name: "Home", url: siteConfig.baseUrl },
   { name: "Blog", url: blogUrl },
@@ -68,40 +81,81 @@ const crumbs = [
 
 const wordCount = (remarkPluginFrontmatter as { wordCount?: number } | undefined)?.wordCount
 const readingLabel = wordCount ? readingTimeLabel("x ".repeat(wordCount)) : undefined
+
+const heroImage = post.data.featuredImage ?? siteConfig.seo.defaultFeaturedImage
 ---
 
 <BaseLayout meta={meta} jsonLd={jsonLd}>
   <Breadcrumbs items={crumbs} />
 
-  <article class="prose prose-lg mt-6 max-w-none">
-    <header class="not-prose mb-8">
-      <h1 class="font-heading text-4xl font-bold text-primary">{post.data.title}</h1>
-      {post.data.excerpt && <p class="mt-3 text-lg text-muted">{post.data.excerpt}</p>}
-      <p class="mt-4 text-sm text-muted">
-        <time datetime={post.data.publishDate.toISOString()}>
-          {post.data.publishDate.toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric" })}
-        </time>
-        {siteConfig.layout.showAuthor && author && <> · {author.name}</>}
-        {siteConfig.layout.showReadingTime && readingLabel && <> · {readingLabel}</>}
-      </p>
-    </header>
+  <header class="not-prose mt-6 mb-10">
+    <h1 class="font-heading text-4xl font-bold text-primary md:text-5xl">{post.data.title}</h1>
+    {post.data.excerpt && <p class="mt-4 text-lg text-muted">{post.data.excerpt}</p>}
+    <p class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+      <time datetime={post.data.publishDate.toISOString()}>
+        {post.data.publishDate.toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric" })}
+      </time>
+      {siteConfig.layout.showAuthor && authors.length > 0 && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span>
+            {authors.map((a, i) => (
+              <>
+                {i > 0 && <span class="text-muted/60"> &amp; </span>}
+                {a.url ? <a href={a.url} class="text-text hover:text-accent">{a.name}</a> : <span>{a.name}</span>}
+              </>
+            ))}
+          </span>
+        </>
+      )}
+      {siteConfig.layout.showReadingTime && readingLabel && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span>{readingLabel}</span>
+        </>
+      )}
+    </p>
+    {heroImage && (
+      <img
+        src={heroImage}
+        alt={post.data.featuredImageAlt ?? post.data.title}
+        class="mt-8 aspect-[16/9] w-full rounded-card object-cover"
+      />
+    )}
+  </header>
 
-    {siteConfig.layout.showTableOfContents && <TableOfContents headings={headings} />}
-
-    <div class="mt-8">
-      <Content />
-    </div>
-
-    {post.data.tags && post.data.tags.length > 0 && (
-      <div class="not-prose mt-10">
-        <TagList tags={post.data.tags} basePath={siteConfig.blogBasePath} />
-      </div>
+  <ArticleLayout>
+    {siteConfig.layout.showTableOfContents && (
+      <TableOfContents slot="toc" headings={headings} sticky maxDepth={4} />
     )}
 
-    <CTABlock siteConfig={siteConfig} category={post.data.category} postOverride={post.data.ctaBlock} registry={ctaRegistry} />
+    <FeaturedPosts
+      slot="aside"
+      posts={featuredForSidebar}
+      basePath={siteConfig.blogBasePath}
+      defaultImage={siteConfig.seo.defaultFeaturedImage}
+      sticky
+    />
 
-    {author && <AuthorBio author={author} />}
+    <article class="prose prose-lg max-w-none">
+      <Content />
 
-    <RelatedPosts posts={related} basePath={siteConfig.blogBasePath} />
-  </article>
+      {post.data.tags && post.data.tags.length > 0 && (
+        <div class="not-prose mt-10">
+          <TagList tags={post.data.tags} basePath={siteConfig.blogBasePath} />
+        </div>
+      )}
+
+      <CTABlock
+        siteConfig={siteConfig}
+        category={post.data.category}
+        postOverride={post.data.ctaBlock}
+        registry={ctaRegistry}
+      />
+
+      {authors.map((author) => <AuthorBio author={author} />)}
+
+      <RelatedPosts posts={related} basePath={siteConfig.blogBasePath} />
+    </article>
+  </ArticleLayout>
 </BaseLayout>

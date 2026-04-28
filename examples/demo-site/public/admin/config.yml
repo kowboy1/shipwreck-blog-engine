@@ -55,7 +55,7 @@ collections:
       - { label: "Publish date", name: "publishDate", widget: "datetime", date_format: "YYYY-MM-DD", time_format: false }
       - { label: "Updated date", name: "updatedDate", widget: "datetime", date_format: "YYYY-MM-DD", time_format: false, required: false }
       - { label: "Status", name: "status", widget: "select", options: ["published", "draft", "scheduled"], default: "published" }
-      - { label: "Author", name: "author", widget: "relation", collection: "authors", search_fields: ["name"], value_field: "{{slug}}", display_fields: ["name"], required: false }
+      - { label: "Authors", name: "authors", widget: "relation", collection: "authors", multiple: true, min: 0, search_fields: ["name"], value_field: "{{slug}}", display_fields: ["name"], required: false, hint: "One or more authors. First author is treated as primary." }
       - { label: "Category", name: "category", widget: "string", required: false, hint: "Single category slug (lowercase). Drives the category archive page and CTA overrides." }
       - { label: "Tags", name: "tags", widget: "list", required: false, default: [] }
       - { label: "Featured image", name: "featuredImage", widget: "image", required: false }

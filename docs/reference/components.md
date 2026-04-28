@@ -42,8 +42,9 @@ Auto-generated from MDX headings.
 |---|---|---|---|---|
 | `headings` | `MarkdownHeading[]` | yes | — | From Astro's `render()` return value |
 | `minDepth` | `number` | no | `2` | Inclusive lower bound (h2) |
-| `maxDepth` | `number` | no | `3` | Inclusive upper bound (h3) |
+| `maxDepth` | `number` | no | `4` | Inclusive upper bound (h4). Bumped from `3` in v0.1.1 |
 | `title` | `string` | no | `"On this page"` | Heading shown above the list |
+| `sticky` | `boolean` | no | `false` | Sticky positioning on `lg:` breakpoint (added v0.1.1) |
 
 **Usage:**
 
@@ -51,10 +52,53 @@ Auto-generated from MDX headings.
 ---
 const { Content, headings } = await render(post)
 ---
-<TableOfContents headings={headings} maxDepth={4} />
+<TableOfContents headings={headings} sticky />
 ```
 
-**Output:** `<aside>` with title + ordered list of links to heading anchors.
+**Output:** `<nav>` with title + ordered list of links to heading anchors. Indents h3/h4 progressively.
+
+---
+
+## ArticleLayout
+
+Three-column responsive grid for article pages. Added in v0.1.1.
+
+**Slots:**
+
+| Slot | Purpose |
+|---|---|
+| `toc` | Left column. Typically `<TableOfContents sticky />` |
+| (default) | Main column. Article header + body + tags + CTA + related |
+| `aside` | Right column. Typically `<FeaturedPosts sticky />` |
+
+Grid collapses to fewer columns when `toc` or `aside` is empty. On mobile (<1024px) it stacks vertically; the ToC becomes a `<details>` accordion.
+
+```astro
+<ArticleLayout>
+  <TableOfContents slot="toc" headings={headings} sticky />
+  <FeaturedPosts slot="aside" posts={featured} basePath={base} sticky />
+  <article class="prose"><Content /></article>
+</ArticleLayout>
+```
+
+---
+
+## FeaturedPosts
+
+Sidebar list of featured (or recent) posts with thumbnails. Added in v0.1.1.
+
+**Props:**
+
+| Prop | Type | Required | Default | Notes |
+|---|---|---|---|---|
+| `posts` | `Array<{id, data: Post}>` | yes | — | Caller controls ordering and selection |
+| `basePath` | `string` | yes | — | Blog base path |
+| `title` | `string` | no | `"Featured articles"` | Section heading |
+| `defaultImage` | `string` | no | — | Fallback when a post has no `featuredImage` |
+| `sticky` | `boolean` | no | `false` | Sticky positioning on `lg:` breakpoint |
+| `limit` | `number` | no | `5` | Max items to render |
+
+Renders nothing if `posts` is empty.
 
 ---
 
@@ -114,14 +158,21 @@ Single-post preview card for use in lists.
 |---|---|---|---|
 | `post` | `{ id: string, data: Post }` | yes | Astro content collection entry |
 | `basePath` | `string` | yes | Blog base path |
+| `defaultImage` | `string` | no | Fallback image when post has no `featuredImage` (added v0.1.1) |
 
 **Usage:**
 
 ```astro
-{posts.map((p) => <PostCard post={p} basePath={siteConfig.blogBasePath} />)}
+{posts.map((p) => (
+  <PostCard
+    post={p}
+    basePath={siteConfig.blogBasePath}
+    defaultImage={siteConfig.seo.defaultFeaturedImage}
+  />
+))}
 ```
 
-**Output:** Optional featured image + title + excerpt + date/author/category line. Linked to the post page.
+**Output:** Optional featured image + title + excerpt + date/category line. Linked to the post page.
 
 ---
 

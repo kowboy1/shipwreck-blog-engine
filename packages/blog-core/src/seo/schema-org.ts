@@ -1,13 +1,40 @@
 import type { Post, SiteConfig, FaqItem } from "../schemas/index.js"
 
+export interface ArticleAuthor {
+  name: string
+  url?: string
+}
+
 export function articleSchema(args: {
   post: Post
   siteConfig: SiteConfig
   url: string
+  authors?: ArticleAuthor[]
+  /** @deprecated use `authors` */
   authorName?: string
+  /** @deprecated use `authors` */
   authorUrl?: string
 }) {
-  const { post, siteConfig, url, authorName, authorUrl } = args
+  const { post, siteConfig, url, authors, authorName, authorUrl } = args
+
+  const authorList: ArticleAuthor[] =
+    authors && authors.length > 0
+      ? authors
+      : authorName
+        ? [{ name: authorName, ...(authorUrl ? { url: authorUrl } : {}) }]
+        : []
+
+  const authorJsonLd =
+    authorList.length === 0
+      ? { "@type": "Organization", name: siteConfig.brand.organizationName }
+      : authorList.length === 1
+        ? { "@type": "Person", name: authorList[0].name, ...(authorList[0].url ? { url: authorList[0].url } : {}) }
+        : authorList.map((a) => ({
+            "@type": "Person",
+            name: a.name,
+            ...(a.url ? { url: a.url } : {}),
+          }))
+
   return {
     "@context": "https://schema.org",
     "@type": post.articleType ?? "BlogPosting",
@@ -16,9 +43,7 @@ export function articleSchema(args: {
     image: post.ogImage ?? post.featuredImage ?? siteConfig.seo.defaultOgImage,
     datePublished: post.publishDate.toISOString(),
     dateModified: (post.updatedDate ?? post.publishDate).toISOString(),
-    author: authorName
-      ? { "@type": "Person", name: authorName, ...(authorUrl ? { url: authorUrl } : {}) }
-      : { "@type": "Organization", name: siteConfig.brand.organizationName },
+    author: authorJsonLd,
     publisher: {
       "@type": "Organization",
       name: siteConfig.brand.organizationName,

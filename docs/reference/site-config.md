@@ -35,6 +35,7 @@ export default config
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `defaultOgImage` | `string` | no | Fallback OG image when post doesn't set one |
+| `defaultFeaturedImage` | `string` | no | Fallback hero/card image when post doesn't set `featuredImage`. Used by `<PostCard>`, `<FeaturedPosts>`, and the post hero |
 | `twitterHandle` | `string` | no | Format: `"@handle"`. Used in Twitter Card |
 | `locale` | `string` | no | Default `"en_AU"`. Used in OG `og:locale` |
 
