@@ -6,16 +6,33 @@ interface Props {
   posts: Array<{ id: string; data: Post }>
   basePath: string
   title?: string
+  defaultImage?: string
+  /** "grid" = 3-up horizontal at md+ (default). "stack" = vertical stack. */
+  layout?: "grid" | "stack"
 }
 
-const { posts, basePath, title = "Related posts" } = Astro.props
+const {
+  posts,
+  basePath,
+  title = "Related articles",
+  defaultImage,
+  layout = "grid",
+} = Astro.props
 ---
 
 {posts.length > 0 && (
-  <section class="mt-12 border-t border-border pt-8">
-    <h2 class="mb-6 font-heading text-2xl font-semibold text-primary">{title}</h2>
-    <div class="space-y-6">
-      {posts.map((post) => <PostCard post={post} basePath={basePath} />)}
+  <section class="mt-16 border-t border-border pt-10">
+    <h2 class="mb-8 font-heading text-2xl font-semibold text-primary">{title}</h2>
+    <div
+      class:list={[
+        layout === "grid"
+          ? "grid grid-cols-1 gap-6 md:grid-cols-3"
+          : "space-y-6",
+      ]}
+    >
+      {posts.map((post) => (
+        <PostCard post={post} basePath={basePath} defaultImage={defaultImage} />
+      ))}
     </div>
   </section>
 )}

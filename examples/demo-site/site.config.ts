@@ -11,6 +11,7 @@ const config: SiteConfig = {
   seo: {
     defaultOgImage: "/og-default.jpg",
     defaultFeaturedImage: "/og-default.jpg",
+    defaultAuthorAvatar: "/og-default.jpg",
     locale: "en_AU",
   },
   layout: {

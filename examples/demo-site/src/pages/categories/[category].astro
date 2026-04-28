@@ -52,10 +52,18 @@ const crumbs = [
   meta={{ ...meta, og: { ...meta.og, type: "website" } }}
   jsonLd={breadcrumbSchema(crumbs.map((c) => ({ name: c.name, url: c.url ?? url })))}
 >
-  <Breadcrumbs items={crumbs} />
-  <h1 class="mt-4 font-heading text-4xl font-bold text-primary capitalize">{category}</h1>
-  <p class="mt-2 text-muted">{posts.length} {posts.length === 1 ? "post" : "posts"}</p>
-  <div class="mt-8 space-y-6">
-    {posts.map((post) => <PostCard post={post} basePath={siteConfig.blogBasePath} />)}
+  <div class="mx-auto max-w-3xl">
+    <Breadcrumbs items={crumbs} />
+    <h1 class="mt-4 font-heading text-4xl font-bold text-primary capitalize">{category}</h1>
+    <p class="mt-2 text-muted">{posts.length} {posts.length === 1 ? "post" : "posts"}</p>
+    <div class="mt-8 space-y-6">
+      {posts.map((post) => (
+        <PostCard
+          post={post}
+          basePath={siteConfig.blogBasePath}
+          defaultImage={siteConfig.seo.defaultFeaturedImage}
+        />
+      ))}
+    </div>
   </div>
 </BaseLayout>

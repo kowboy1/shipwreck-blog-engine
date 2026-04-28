@@ -1,26 +1,30 @@
 ---
 import type { AuthorRecord } from "../schemas/author.js"
+import AuthorAvatar from "./AuthorAvatar.astro"
 
 interface Props {
   author: AuthorRecord
+  /** When set, the avatar + name link to this URL (typically /blog/authors/<id>/) */
+  href?: string
+  /** Optional fallback image used when author.avatar is unset */
+  fallbackImage?: string
 }
 
-const { author } = Astro.props
+const { author, href, fallbackImage } = Astro.props
 ---
 
-<aside class="mt-12 flex gap-4 rounded-card border border-border bg-bg p-6">
-  {author.avatar && (
-    <img
-      src={author.avatar}
-      alt={author.name}
-      class="h-16 w-16 flex-none rounded-full object-cover"
-      loading="lazy"
-    />
-  )}
+<aside class="not-prose mt-12 flex items-start gap-4 rounded-card border border-border bg-bg/60 p-6 backdrop-blur">
+  <AuthorAvatar author={author} size={72} fallbackImage={fallbackImage} />
   <div class="min-w-0">
-    <p class="font-heading text-lg font-semibold text-primary">{author.name}</p>
+    <p class="font-heading text-lg font-semibold text-primary">
+      {href ? (
+        <a href={href} class="hover:text-accent">{author.name}</a>
+      ) : (
+        <span>{author.name}</span>
+      )}
+    </p>
     {author.bio && <p class="mt-1 text-sm text-muted">{author.bio}</p>}
-    <div class="mt-2 flex gap-3 text-sm">
+    <div class="mt-2 flex flex-wrap gap-3 text-sm">
       {author.url && <a href={author.url} class="text-accent hover:underline">Website</a>}
       {author.twitter && (
         <a href={`https://twitter.com/${author.twitter.replace("@", "")}`} class="text-accent hover:underline">

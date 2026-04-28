@@ -4,6 +4,32 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-04-28
+
+### Fixed
+- Article layout was unusable: `BaseLayout` constrained everything to `max-w-3xl` (768px), so the 3-column ArticleLayout grid never had room and stacked into one tiny column with broken text wrapping. `BaseLayout` no longer applies a width constraint; pages set their own `max-w-3xl` (index/archives) or `max-w-7xl` (post page) wrapper.
+
+### Added
+- `<AuthorAvatar>` component — avatar with initials fallback when author has no `avatar` set. Used in byline + AuthorBio.
+- `siteConfig.seo.defaultAuthorAvatar` — site-wide fallback avatar image
+- AuthorBio `href` prop — avatar + name link to the author's archive page
+- AuthorBio `fallbackImage` prop — passed through to AuthorAvatar
+- RelatedPosts `layout` prop — `"grid"` (3-up horizontal at md+, default) or `"stack"` (vertical)
+- Post page now shows author avatar + name in the byline, linked to `/blog/authors/<id>/`. Multi-author posts show stacked avatars.
+
+### Changed
+- Article page restructured to match SydneyPI reference layout:
+  - Wide container (`max-w-7xl`)
+  - **Left:** sticky ToC
+  - **Middle:** title, byline (with avatar), excerpt, hero image, body, tags, multi-author bios
+  - **Right:** sticky CTA only (FeaturedPosts removed from sidebar)
+  - **Below:** "More articles" horizontal 3-column grid (uses `RelatedPosts layout="grid"`)
+- Index/archive pages now wrap content in `max-w-3xl` (was implicit via BaseLayout)
+- All listing pages now pass `defaultImage={siteConfig.seo.defaultFeaturedImage}` to PostCard
+
+### Notes
+- FeaturedPosts component still exists and can be used in custom layouts (it's just not used in the default post page anymore)
+
 ## [0.1.1] - 2026-04-28
 
 ### Added

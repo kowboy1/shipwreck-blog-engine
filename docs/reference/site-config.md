@@ -36,6 +36,7 @@ export default config
 |---|---|---|---|
 | `defaultOgImage` | `string` | no | Fallback OG image when post doesn't set one |
 | `defaultFeaturedImage` | `string` | no | Fallback hero/card image when post doesn't set `featuredImage`. Used by `<PostCard>`, `<FeaturedPosts>`, and the post hero |
+| `defaultAuthorAvatar` | `string` | no | Fallback avatar when an author entry has no `avatar` field. Used by `<AuthorAvatar>` and `<AuthorBio>` (added v0.1.2) |
 | `twitterHandle` | `string` | no | Format: `"@handle"`. Used in Twitter Card |
 | `locale` | `string` | no | Default `"en_AU"`. Used in OG `og:locale` |
 

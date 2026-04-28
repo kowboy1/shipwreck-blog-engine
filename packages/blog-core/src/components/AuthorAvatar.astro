@@ -1,0 +1,49 @@
+---
+import type { AuthorRecord } from "../schemas/author.js"
+
+interface Props {
+  author: AuthorRecord
+  /** Pixel size for the rendered avatar. Defaults to 40 (md). */
+  size?: number
+  /** Extra classes to apply to the wrapper. */
+  class?: string
+  /** Optional default image when author has no avatar set. */
+  fallbackImage?: string
+}
+
+const { author, size = 40, class: className = "", fallbackImage } = Astro.props
+
+const initials = author.name
+  .split(/\s+/)
+  .map((s) => s[0])
+  .filter(Boolean)
+  .slice(0, 2)
+  .join("")
+  .toUpperCase()
+
+const image = author.avatar ?? fallbackImage
+const dim = `${size}px`
+---
+
+{image ? (
+  <img
+    src={image}
+    alt={author.name}
+    width={size}
+    height={size}
+    style={`width:${dim};height:${dim}`}
+    class:list={["flex-none rounded-full object-cover", className]}
+    loading="lazy"
+  />
+) : (
+  <span
+    aria-label={author.name}
+    style={`width:${dim};height:${dim};font-size:${Math.round(size * 0.4)}px`}
+    class:list={[
+      "flex flex-none items-center justify-center rounded-full bg-accent/20 font-semibold text-accent",
+      className,
+    ]}
+  >
+    {initials || "?"}
+  </span>
+)}

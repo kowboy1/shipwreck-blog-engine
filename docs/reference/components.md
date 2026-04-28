@@ -112,7 +112,9 @@ Renders a list of related posts using `<PostCard>` for each.
 |---|---|---|---|---|
 | `posts` | `Array<{ id, data: Post }>` | yes | — | Sorted by relevance, usually from `rankRelatedPosts()` |
 | `basePath` | `string` | yes | — | Blog base path for URL construction |
-| `title` | `string` | no | `"Related posts"` | Section heading |
+| `title` | `string` | no | `"Related articles"` | Section heading |
+| `defaultImage` | `string` | no | — | Fallback image passed to PostCard (added v0.1.2) |
+| `layout` | `"grid" \| "stack"` | no | `"grid"` | `"grid"` = 3-up at md+ (default v0.1.2), `"stack"` = vertical |
 
 **Usage:**
 
@@ -125,6 +127,23 @@ const related = rankRelatedPosts({ current: post, candidates: all, limit: 3 })
 
 ---
 
+## AuthorAvatar
+
+Avatar circle with initials fallback when author has no image set. Added in v0.1.2.
+
+**Props:**
+
+| Prop | Type | Required | Default | Notes |
+|---|---|---|---|---|
+| `author` | `AuthorRecord` | yes | — | Author entry |
+| `size` | `number` | no | `40` | Pixel dimension (square) |
+| `class` | `string` | no | `""` | Extra classes on wrapper |
+| `fallbackImage` | `string` | no | — | Used when `author.avatar` is unset (typically `siteConfig.seo.defaultAuthorAvatar`) |
+
+If neither `author.avatar` nor `fallbackImage` is set, renders a circle with the author's initials.
+
+---
+
 ## AuthorBio
 
 Renders an author card with avatar, bio, and social links.
@@ -134,6 +153,8 @@ Renders an author card with avatar, bio, and social links.
 | Prop | Type | Required | Notes |
 |---|---|---|---|
 | `author` | `AuthorRecord` | yes | The Zod-validated author entry |
+| `href` | `string` | no | When set, the author name links to this URL — typically `/blog/authors/<id>/` (added v0.1.2) |
+| `fallbackImage` | `string` | no | Passed through to `<AuthorAvatar>` (added v0.1.2) |
 
 **Usage:**
 
