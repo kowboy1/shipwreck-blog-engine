@@ -1,53 +1,61 @@
 #!/usr/bin/env node
 /**
- * shipwreck-blog-doctor — preflight + post-install integration checker.
+ * shipwreck-blog-doctor — preflight + post-install integration checker + closeout gate.
  *
- * Runs from the consumer per-site repo's `_blog/` (or root if no `_blog/` subdir).
- * Fails fast with clear, actionable messages if anything that would break a real
- * integration is wrong. Designed to be the FIRST and LAST thing an agent runs:
- *
- *   - Right after `npm install` to catch broken file: deps before building
- *   - Right before declaring "done" to catch skipped phases of the integration skill
+ * Runs from the consumer per-site repo's `_blog/`. Fails fast with clear,
+ * actionable messages if anything that would break or invalidate a real
+ * integration is wrong.
  *
  * Exit code 0 = all checks passed. Non-zero = at least one fatal issue.
  *
- * Usage:
- *   npx shipwreck-blog-doctor                  # all checks (install + integration), fatal on fail
- *   npx shipwreck-blog-doctor --preflight      # install-level only (engine resolves, file: deps OK)
- *   npx shipwreck-blog-doctor --skip-build     # skip the build check (faster)
- *   npx shipwreck-blog-doctor --json           # machine-readable output
- *   npx shipwreck-blog-doctor --final \        # strictest mode: declare integration done
- *     --phase9-confirmed \                     #   require Phase 9 questions asked
- *     --feedback-status=provided               #   require feedback file OR
- *     # OR --feedback-status=none-needed       #   explicit no-feedback declaration
+ * ## Usage
  *
- * Mode summary:
- *   --preflight   = run RIGHT AFTER npm install. Skips Phase 2/3/build checks.
- *                   Catches install-time bugs (broken symlinks, scaffold corruption).
- *   (default)     = run BEFORE the final completion check. Includes install +
- *                   Phase 2/3 checks (tokens.css present, SiteShell ported,
- *                   global.css cascade order, no demo content) + build + CSS sanity.
- *   --final       = the gate for declaring integration DONE. Default checks PLUS
- *                   requires --phase9-confirmed and --feedback-status=<provided|none-needed>.
- *                   You cannot reach 0 fatal in --final mode without explicitly
- *                   confirming you completed the end-of-job protocol.
+ *   # Default: full closeout gate (run BEFORE declaring done to user)
+ *   npx shipwreck-blog-doctor
+ *
+ *   # Reduced modes (use during development, not for declaring done)
+ *   npx shipwreck-blog-doctor --preflight       # install-level only
+ *   npx shipwreck-blog-doctor --lite            # technical only, no procedural gates
+ *   npx shipwreck-blog-doctor --skip-build      # skip the build check (faster)
+ *   npx shipwreck-blog-doctor --json            # machine-readable output
+ *
+ *   # Attestations — write entries to .shipwreck-integration-state.json
+ *   # Without these, default doctor mode FAILS — you cannot declare done.
+ *   npx shipwreck-blog-doctor attest-phase9 '<json-string-of-answers>'
+ *   npx shipwreck-blog-doctor attest-feedback provided <FEEDBACK-FOR-CLAUDE-name.md>
+ *   npx shipwreck-blog-doctor attest-feedback none-needed "<short reason>"
+ *   npx shipwreck-blog-doctor attest-nav-link approved
+ *   npx shipwreck-blog-doctor attest-nav-link declined
+ *
+ *   # Completion contract — outputs the audit-trail block as stdout. Pipe this
+ *   # block VERBATIM into your reply to the user. This is the only valid way
+ *   # to report "done" — paraphrasing, summarising, or composing your own
+ *   # status message is a protocol violation.
+ *   npx shipwreck-blog-doctor print-completion
+ *
+ * ## Why default = full closeout gate
+ *
+ * Previous versions had `--final` as opt-in. Agents reflexively ran default
+ * `npm run doctor`, saw "0 fatal", and declared done having skipped Phases
+ * 7-9. Reversed in v0.3.6: default mode IS the closeout gate. Agents who
+ * want intermediate technical checks during development use `--lite`.
  */
-import { existsSync, readFileSync, statSync, readdirSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { existsSync, readFileSync, writeFileSync, statSync, readdirSync, mkdirSync } from "node:fs"
+import { join, resolve, dirname, basename } from "node:path"
 import { execSync } from "node:child_process"
 import process from "node:process"
 
 const argv = process.argv.slice(2)
 const args = new Set(argv)
 const PREFLIGHT = args.has("--preflight")
+const LITE = args.has("--lite")
 const SKIP_BUILD = args.has("--skip-build") || PREFLIGHT
 const JSON_OUT = args.has("--json")
-const FINAL = args.has("--final") // strictest mode: requires Phase 9 + feedback flags
-const PHASE9_CONFIRMED = args.has("--phase9-confirmed")
-// --feedback-status=<provided|none-needed>
-const feedbackArg = argv.find((a) => a.startsWith("--feedback-status="))
-const FEEDBACK_STATUS = feedbackArg ? feedbackArg.split("=")[1] : null
 const CWD = process.cwd()
+
+// Default invocation = full closeout gate (formerly --final). Reversed in v0.3.6.
+const FULL = !PREFLIGHT && !LITE
+const SUBCOMMAND = argv[0] && !argv[0].startsWith("--") ? argv[0] : null
 
 const checks = []
 const fatal = []
@@ -71,6 +79,235 @@ function resolvePackageJson(pkg, fromDir) {
     dir = parent
   }
 }
+
+// ---------- state file (.shipwreck-integration-state.json) ----------
+//
+// Lives at the root of the consumer's _blog/ dir (same dir as package.json).
+// Tracks attestations the agent makes via the attest-* subcommands. Default
+// doctor mode reads this and FAILS if the required attestations aren't there
+// — that's the procedural gate. Agent cannot pass default doctor without
+// having actually performed the actions the attestations claim.
+
+const STATE_FILE = join(CWD, ".shipwreck-integration-state.json")
+
+function readState() {
+  if (!existsSync(STATE_FILE)) return null
+  try {
+    return JSON.parse(readFileSync(STATE_FILE, "utf8"))
+  } catch {
+    return null
+  }
+}
+
+function writeState(state) {
+  writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + "\n")
+}
+
+function blankState() {
+  return {
+    engineVersion: null,
+    siteName: null,
+    phase9: { asked: false, ts: null, answers: null },
+    feedback: { status: null, file: null, reason: null, ts: null },
+    navLink: { decision: null, ts: null }, // "approved" | "declined" | null
+  }
+}
+
+// ---------- subcommands ----------
+
+function attestPhase9(args) {
+  if (args.length === 0) {
+    console.error(`Usage: shipwreck-blog-doctor attest-phase9 '<json-answers>'
+
+You must pass a JSON string with the user's answers to the Phase 9 questions.
+Example:
+
+  npx shipwreck-blog-doctor attest-phase9 '{
+    "latest3Callout": "no",
+    "rssFooterLink": "yes — added to host footer",
+    "gscSubmission": "yes",
+    "crossLinks": "deferred — listed in site notes",
+    "sveltiaCMS": "no — single editor"
+  }'
+
+Pass this attestation ONLY after you have actually asked the user every
+Phase 9 question and recorded their answers. The default doctor reads
+this file to confirm Phase 9 happened.
+`)
+    process.exit(1)
+  }
+  let answers
+  try {
+    answers = JSON.parse(args[0])
+  } catch (e) {
+    console.error(`attest-phase9: argument must be valid JSON. Got: ${args[0]}\nError: ${e.message}`)
+    process.exit(1)
+  }
+  const required = ["latest3Callout", "rssFooterLink", "gscSubmission", "crossLinks", "sveltiaCMS"]
+  const missing = required.filter((k) => !(k in answers))
+  if (missing.length > 0) {
+    console.error(`attest-phase9: missing required answer keys: ${missing.join(", ")}`)
+    console.error(`Required keys: ${required.join(", ")}`)
+    process.exit(1)
+  }
+  const state = readState() ?? blankState()
+  state.phase9 = { asked: true, ts: new Date().toISOString(), answers }
+  writeState(state)
+  console.log(`✓ Phase 9 attested. Recorded ${Object.keys(answers).length} answers in ${STATE_FILE}.`)
+}
+
+function attestFeedback(args) {
+  const status = args[0]
+  if (status === "provided") {
+    const file = args[1]
+    if (!file) {
+      console.error(`Usage: shipwreck-blog-doctor attest-feedback provided <FEEDBACK-FOR-CLAUDE-name.md>`)
+      process.exit(1)
+    }
+    // Search upward for the engine repo root and verify the file exists there
+    let found = false
+    let dir = CWD
+    while (true) {
+      const candidate = join(dir, file)
+      if (existsSync(candidate)) { found = true; break }
+      const parent = resolve(dir, "..")
+      if (parent === dir) break
+      dir = parent
+    }
+    if (!found) {
+      console.error(`attest-feedback: '${file}' not found in any parent dir of ${CWD}. Write the feedback file at the engine repo root first.`)
+      process.exit(1)
+    }
+    const state = readState() ?? blankState()
+    state.feedback = { status: "provided", file, reason: null, ts: new Date().toISOString() }
+    writeState(state)
+    console.log(`✓ Feedback attested as 'provided' (${file}).`)
+  } else if (status === "none-needed") {
+    const reason = args.slice(1).join(" ")
+    if (!reason || reason.length < 10) {
+      console.error(`Usage: shipwreck-blog-doctor attest-feedback none-needed "<at-least-10-char honest reason>"
+
+Don't pass 'none-needed' lazily. The reason is your audit trail — you're
+saying you genuinely considered whether anything in the engine could be
+improved based on this run AND determined nothing useful would come from
+a feedback note. Write a one-sentence reason that proves you actually
+thought about it.
+`)
+      process.exit(1)
+    }
+    const state = readState() ?? blankState()
+    state.feedback = { status: "none-needed", file: null, reason, ts: new Date().toISOString() }
+    writeState(state)
+    console.log(`✓ Feedback attested as 'none-needed' with reason: ${reason}`)
+  } else {
+    console.error(`Usage: shipwreck-blog-doctor attest-feedback <provided|none-needed> ...`)
+    process.exit(1)
+  }
+}
+
+function attestNavLink(args) {
+  const decision = args[0]
+  if (decision !== "approved" && decision !== "declined") {
+    console.error(`Usage: shipwreck-blog-doctor attest-nav-link <approved|declined>
+
+Phase 7b explicitly says ASK the user before adding a nav link. This
+attestation records what the user said:
+- 'approved' = user said yes; you have added the nav link to the host site
+- 'declined' = user said no; do NOT add a nav link
+`)
+    process.exit(1)
+  }
+  const state = readState() ?? blankState()
+  state.navLink = { decision, ts: new Date().toISOString() }
+  writeState(state)
+  console.log(`✓ Nav link decision attested: ${decision}.`)
+}
+
+function printCompletion() {
+  // Run the full default doctor check first — must pass before completion can print.
+  const result = execSync(
+    `node ${process.argv[1]}`,
+    { cwd: CWD, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  ).then?.(undefined) ?? null
+  // We can't easily capture from execSync without try/catch — do it that way:
+  let doctorPassed = false
+  try {
+    execSync(`node ${process.argv[1]}`, { cwd: CWD, stdio: "pipe" })
+    doctorPassed = true
+  } catch {
+    doctorPassed = false
+  }
+  if (!doctorPassed) {
+    console.error(`✗ Cannot print completion message — default doctor mode is failing.
+
+Run 'npx shipwreck-blog-doctor' to see what's blocking. Fix the failures,
+then try print-completion again. There is no way to bypass this — if
+doctor fails, the integration is not done, and there is no valid
+completion message to emit.
+`)
+    process.exit(1)
+  }
+  const state = readState()
+  if (!state) {
+    console.error(`✗ No state file at ${STATE_FILE}. Run the attest-* subcommands first.`)
+    process.exit(1)
+  }
+
+  // Engine version from blog-core
+  const enginePkg = resolvePackageJson("@shipwreck/blog-core", CWD)
+  const engineVersion = enginePkg ? JSON.parse(readFileSync(enginePkg.path, "utf8")).version : "unknown"
+
+  // Site config for domain
+  let domain = "<domain>"
+  let siteName = state.siteName ?? "<site-name>"
+  const configPaths = ["site.config.ts", "_blog/site.config.ts"].map((p) => resolve(CWD, p))
+  for (const p of configPaths) {
+    if (existsSync(p)) {
+      const c = readFileSync(p, "utf8")
+      const dm = c.match(/baseUrl:\s*"([^"]+)"/)
+      if (dm) domain = dm[1].replace(/\/$/, "")
+      const nm = c.match(/siteName:\s*"([^"]+)"/)
+      if (nm) siteName = nm[1]
+      break
+    }
+  }
+
+  const phase9Summary = state.phase9.answers
+    ? Object.entries(state.phase9.answers).map(([k, v]) => `    - ${k}: ${v}`).join("\n")
+    : "    (none)"
+
+  const feedbackLine = state.feedback.status === "provided"
+    ? `Engine feedback: provided in ${state.feedback.file}`
+    : `Engine feedback: none-needed — "${state.feedback.reason}"`
+
+  const navLine = state.navLink.decision === "approved"
+    ? `Nav link: user approved; added to host`
+    : state.navLink.decision === "declined"
+      ? `Nav link: user declined; footer-only`
+      : `Nav link: not asked (FAIL — should not have reached here)`
+
+  // The audit-trail block. This is the ONLY valid completion message format.
+  console.log(`Integration done. Verifications:
+- shipwreck-blog-doctor: ✓ all checks passed (default mode = full closeout gate)
+- Engine version: ${engineVersion}
+- Site: ${siteName} (${domain})
+- Live URL: ${domain}/blog/ rendering correctly + visually matches host
+- Phase 9 questions: asked, answers captured below
+${phase9Summary}
+- ${navLine}
+- ${feedbackLine}
+- Phase 9 attested at: ${state.phase9.ts}
+`)
+  process.exit(0)
+}
+
+// ---------- subcommand dispatch (after all helpers are defined) ----------
+
+if (SUBCOMMAND === "attest-phase9") { attestPhase9(argv.slice(1)); process.exit(0) }
+if (SUBCOMMAND === "attest-feedback") { attestFeedback(argv.slice(1)); process.exit(0) }
+if (SUBCOMMAND === "attest-nav-link") { attestNavLink(argv.slice(1)); process.exit(0) }
+if (SUBCOMMAND === "print-completion") { printCompletion() }
 
 // 1. Engine packages resolve (file: deps not broken — walking up parent
 // dirs to handle npm workspace hoisting)
@@ -296,52 +533,108 @@ if (!SKIP_BUILD) {
   }
 }
 
-// 9. FINAL-MODE gates: Phase 9 confirmation + feedback declaration
-// These flags are how the agent confirms they've completed the protocol.
-// Without them, --final cannot pass.
-if (FINAL) {
-  if (!PHASE9_CONFIRMED) {
+// 8. FULL-MODE (default) procedural gates — read attestations from state file.
+// These are the gates that turn "agent declared done" into "agent actually
+// completed Phase 7-9". An agent cannot bypass these — the only way to make
+// these checks pass is to actually run the attest-* subcommands, which
+// require concrete proof (Phase 9 answers JSON, feedback file path, etc.).
+//
+// In --lite or --preflight modes, these checks are skipped (you're not yet
+// declaring done; you're checking technical health during development).
+if (FULL) {
+  const state = readState()
+
+  // 8a. Phase 9 attestation
+  if (!state || !state.phase9?.asked) {
     fail(
-      "Phase 9 questions not confirmed",
-      "You ran --final without --phase9-confirmed. The integration skill's Phase 9 requires asking the user about: latest-3 callout, RSS link, GSC submission, cross-link plan, Sveltia CMS enablement. " +
-        "Pass --phase9-confirmed only AFTER you have asked every question and acted on or logged the answer. Do not pass this flag if you skipped Phase 9.",
+      "Phase 9 not attested",
+      `Default doctor (full closeout gate) requires evidence that you asked the user the Phase 9 questions. ` +
+        `Run: npx shipwreck-blog-doctor attest-phase9 '<json-of-answers>'\n` +
+        `Don't run that subcommand until you have actually asked every question and recorded the user's answers — it writes to ${STATE_FILE} as your audit trail.`,
     )
   } else {
-    pass("Phase 9 questions confirmed (--phase9-confirmed flag passed)")
+    pass(`Phase 9 attested at ${state.phase9.ts}`, `${Object.keys(state.phase9.answers).length} answers recorded`)
   }
 
-  if (FEEDBACK_STATUS === "provided") {
-    // Find the FEEDBACK file
-    const candidates = readdirSync(CWD).filter((f) => f.startsWith("FEEDBACK-FOR-CLAUDE-") && f.endsWith(".md"))
-    // Also check engine repo root if we can find it
-    const enginePkg = resolvePackageJson("@shipwreck/blog-core", CWD)
-    let engineRoot = null
-    if (enginePkg) {
-      // walk up from package.json: .../packages/blog-core/package.json -> .../
-      engineRoot = resolve(enginePkg.path, "..", "..", "..")
-    }
-    const engineCandidates = engineRoot && existsSync(engineRoot)
-      ? readdirSync(engineRoot).filter((f) => f.startsWith("FEEDBACK-FOR-CLAUDE-") && f.endsWith(".md"))
-      : []
-
-    if (candidates.length === 0 && engineCandidates.length === 0) {
-      fail(
-        "Feedback status is 'provided' but no FEEDBACK-FOR-CLAUDE-*.md found",
-        `Searched ${CWD} and ${engineRoot ?? "(engine root not located)"}. ` +
-          `Either write the feedback file, OR pass --feedback-status=none-needed.`,
-      )
-    } else {
-      pass(
-        "Feedback file present",
-        [...candidates.map((f) => `${CWD}/${f}`), ...engineCandidates.map((f) => `${engineRoot}/${f}`)].join(", "),
-      )
-    }
-  } else if (FEEDBACK_STATUS === "none-needed") {
-    pass("Feedback status: none needed (declared explicitly)")
-  } else {
+  // 8b. Feedback attestation
+  if (!state || !state.feedback?.status) {
     fail(
-      "Feedback status not declared",
-      "You ran --final without --feedback-status=provided or --feedback-status=none-needed. The skill requires you to either write a FEEDBACK-FOR-CLAUDE-<job>.md OR explicitly declare 'no engine feedback this run'. Pick one.",
+      "Feedback status not attested",
+      `Default doctor requires you to declare whether engine feedback was produced. Either:\n` +
+        `  npx shipwreck-blog-doctor attest-feedback provided <FEEDBACK-FOR-CLAUDE-name.md>\n` +
+        `OR\n` +
+        `  npx shipwreck-blog-doctor attest-feedback none-needed "<at-least-10-char honest reason>"`,
+    )
+  } else if (state.feedback.status === "provided") {
+    pass(`Feedback attested as 'provided'`, state.feedback.file)
+  } else {
+    pass(`Feedback attested as 'none-needed'`, state.feedback.reason)
+  }
+
+  // 8c. Nav-link attestation (Phase 7b)
+  if (!state || !state.navLink?.decision) {
+    fail(
+      "Phase 7b nav link decision not attested",
+      `Phase 7b requires asking the user whether to add a 'Blog' link to the main nav (vs footer-only). Then attest the answer:\n` +
+        `  npx shipwreck-blog-doctor attest-nav-link approved   # if user said yes AND you added the link to host nav\n` +
+        `  npx shipwreck-blog-doctor attest-nav-link declined   # if user said no\n` +
+        `Do NOT attest 'approved' if you didn't actually ask. Do NOT add a nav link without attestation.`,
+    )
+  } else {
+    pass(`Phase 7b nav link decision: ${state.navLink.decision}`, `attested at ${state.navLink.ts}`)
+  }
+
+  // 8d. Phase 7a footer-link host-side check.
+  // Walk up from CWD until we find what looks like the site repo root (a dir
+  // ABOVE _blog/ that contains site files), then grep for /blog references
+  // in HTML/Astro files OUTSIDE of _blog/ and node_modules/.
+  let siteRepoRoot = null
+  let dir = CWD
+  // _blog/ is typically a child of the site repo; the site repo has the host's pages
+  if (basename(CWD) === "_blog" || basename(resolve(CWD, "..")) === "_blog") {
+    siteRepoRoot = basename(CWD) === "_blog" ? resolve(CWD, "..") : resolve(CWD, "..", "..")
+  }
+  if (siteRepoRoot && existsSync(siteRepoRoot)) {
+    let footerLinkFound = false
+    let searchedFiles = 0
+    try {
+      // Lightweight grep: read up to 50 .html/.astro files at the site repo root, skip _blog and node_modules
+      function walkLight(d, depth = 0) {
+        if (depth > 4 || searchedFiles >= 50 || footerLinkFound) return
+        const entries = readdirSync(d, { withFileTypes: true })
+        for (const ent of entries) {
+          if (footerLinkFound || searchedFiles >= 50) return
+          if (ent.name === "_blog" || ent.name === "node_modules" || ent.name === ".git" || ent.name.startsWith(".astro")) continue
+          const p = join(d, ent.name)
+          if (ent.isDirectory()) {
+            walkLight(p, depth + 1)
+          } else if (/\.(html|astro|tsx|jsx|vue|svelte|php|liquid)$/i.test(ent.name)) {
+            searchedFiles++
+            const content = readFileSync(p, "utf8")
+            // Look for an anchor or link to /blog (root-relative or fully qualified)
+            if (/href=["']\/blog\/?["']|href=["']https?:\/\/[^"']+\/blog\/?["']/.test(content)) {
+              footerLinkFound = true
+              return
+            }
+          }
+        }
+      }
+      walkLight(siteRepoRoot)
+    } catch { /* ignore */ }
+
+    if (footerLinkFound) {
+      pass("Host site has a /blog link (Phase 7a footer link wired)", `searched ${searchedFiles} files in ${siteRepoRoot}`)
+    } else {
+      fail(
+        "No /blog link found in host site files",
+        `Searched ${searchedFiles} HTML/Astro/template files in ${siteRepoRoot} — no <a href="/blog"> or fully-qualified blog link found.\n` +
+          `Phase 7a requires adding a 'Blog' link to the host's footer so visitors can discover the blog. Without it the blog is technically live but invisible.`,
+      )
+    }
+  } else {
+    warning(
+      "Could not auto-detect site repo root for Phase 7a check",
+      `Doctor walks up from CWD looking for a parent dir of _blog/. Couldn't find it. If you're running from somewhere unusual, the Phase 7a footer check is skipped — verify manually that the host site has a /blog link.`,
     )
   }
 }

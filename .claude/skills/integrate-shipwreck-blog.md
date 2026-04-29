@@ -404,29 +404,85 @@ For each yes: do the work and verify. For each no/later: log it in `<site-repo>/
 
 ---
 
-## 🛑 Final blocking checkpoint — single command gate
+## 🛑 Completion contract — only one valid path to "done"
+
+Default `npx shipwreck-blog-doctor` (no flags) is the closeout gate as of v0.3.6. It runs all install + Phase 2/3/5 checks AND requires three attestations from a state file. **You cannot reach 0 fatal without those attestations**, and writing them requires running specific subcommands that themselves require concrete proof.
+
+### Step 1 — Attest Phase 9 (after asking the user every question)
 
 ```bash
 cd <site-repo>/_blog
-npx shipwreck-blog-doctor --final \
-  --phase9-confirmed \
-  --feedback-status=provided     # if you wrote a FEEDBACK-FOR-CLAUDE-<job>.md
-  # OR --feedback-status=none-needed  # if explicitly nothing to feed back this run
+npx shipwreck-blog-doctor attest-phase9 '{
+  "latest3Callout": "<user-answer>",
+  "rssFooterLink": "<user-answer>",
+  "gscSubmission": "<user-answer>",
+  "crossLinks": "<user-answer>",
+  "sveltiaCMS": "<user-answer>"
+}'
 ```
 
-**This is the ONLY gate for declaring done.** Don't pass `--phase9-confirmed` if you skipped Phase 9. Don't pass `--feedback-status=none-needed` unless you genuinely have nothing to feed back.
+Run this AFTER you have asked every Phase 9 question and recorded the user's answers. The JSON gets written to `_blog/.shipwreck-integration-state.json` as the audit trail. If you didn't ask the questions, do not run this — fix Phase 9 first.
 
-When `--final` returns 0 fatal, your status message to the user MUST include:
+### Step 2 — Attest the nav link decision (Phase 7b)
 
+```bash
+npx shipwreck-blog-doctor attest-nav-link approved   # if user said yes AND you added it to host nav
+# OR
+npx shipwreck-blog-doctor attest-nav-link declined   # if user said no — do NOT add nav link
 ```
-Integration done. Verifications:
-- shipwreck-blog-doctor --final: ✓ all checks passed
-- Live URL: https://<domain>/blog/ rendering correctly + visually matches host
-- Site repo: <repo-url-or-path>
-- Engine version: 0.3.5
-- Phase 9 questions: asked all 5; answers — [summarise]
-- Engine feedback: [link to FEEDBACK doc OR "no feedback needed: [reason]"]
+
+Do NOT attest `approved` if you didn't actually ask the user, or if you added a nav link without their approval.
+
+### Step 3 — Attest feedback status
+
+```bash
+# If you wrote a FEEDBACK-FOR-CLAUDE-<job>.md at the engine repo root:
+npx shipwreck-blog-doctor attest-feedback provided FEEDBACK-FOR-CLAUDE-<job>.md
+
+# If you genuinely have nothing to feed back (rare — most real integrations have something):
+npx shipwreck-blog-doctor attest-feedback none-needed "<at-least-10-char honest reason>"
 ```
+
+Doctor refuses lazy `none-needed` reasons (<10 chars). The reason field is your audit trail.
+
+### Step 4 — Verify the gate passes
+
+```bash
+npx shipwreck-blog-doctor   # default mode = full closeout gate
+```
+
+Must exit 0. If any fatal issue, it is not done.
+
+### Step 5 — Emit the completion message
+
+```bash
+npx shipwreck-blog-doctor print-completion
+```
+
+This re-runs the gate AND outputs the canonical audit-trail block on stdout. **Your reply to the user MUST include this stdout VERBATIM.** Do not paraphrase, summarise, or compose your own status message — that is a protocol violation. The completion message is the literal output of the tool.
+
+Example: your final reply to the user should look like
+
+> [your narrative wrap-up — what you did, any context]
+>
+> ```
+> [paste the print-completion stdout VERBATIM here]
+> ```
+
+If `print-completion` exits non-zero, doctor is failing — you are not done. Fix what's broken before trying again.
+
+### Failure modes to watch for in your own behaviour
+
+These are what previous agents (Nyxi included) have done that produced broken integrations. If you catch yourself doing any of these, stop:
+
+- **"I'll just use the demo posts — they look fine"** — they're labelled as engine boilerplate. Real sites have real content (or empty posts dir).
+- **"Optional questions I'll mention but not ask"** — Phase 9 is not optional. Ask in this session, as actual prompts.
+- **"Doctor passed so I'm done"** — that's only true for `npx shipwreck-blog-doctor` (default mode). If you ran `--lite` or `--preflight`, those are intermediate checks, not the gate.
+- **"It builds and serves so it's working"** — see CHANGELOG 0.3.4: previous integration built and served but the cascade-order bug meant the dark theme was overridden. Working ≠ integrated.
+- **"I'll write feedback if I think of something"** — write feedback now or attest `none-needed` with an honest reason. The "I'll think later" path leads to the engine never improving.
+- **"Let me create a separate blog repo for this site"** — STOP. The blog goes inside the site repo (Phase 0 + 1).
+- **"User said go ahead, so I'll do all phases at once and tell them"** — if a phase requires interactive input from the user (Phase 7b nav, Phase 9 questions), STOP and ask. "Go ahead" means continue the sequence, not jump to closeout.
+- **"I'll write my own status message — print-completion is just for show"** — the print-completion stdout IS your status message. Composing your own narrative instead is a protocol violation that the user WILL notice.
 
 ### Failure modes to watch for in your own behaviour
 

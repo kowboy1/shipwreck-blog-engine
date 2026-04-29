@@ -8,6 +8,86 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-04-29
+
+Closes the agent-procedural-drift gap that prose alone could not. Direct response to Nyxi's third integration attempt where she did the technical work but skipped Phase 7 (host wiring), Phase 9 (post-install questions), feedback writing, and the audit-trail status message — all of which the skill explicitly required. Her own diagnosis: "the missing enforcement is machine-level gating, not prose reminders." This release adds the machine-level gating.
+
+### Doctor: state file + attest subcommands
+
+New mechanism: `_blog/.shipwreck-integration-state.json` tracks user-confirmed attestations the agent makes via subcommands. Default doctor reads this and FAILS if required attestations aren't present.
+
+```bash
+# After asking the Phase 9 questions:
+npx shipwreck-blog-doctor attest-phase9 '<json-of-answers>'
+
+# After deciding nav link with the user (Phase 7b):
+npx shipwreck-blog-doctor attest-nav-link approved   # or declined
+
+# After deciding on feedback:
+npx shipwreck-blog-doctor attest-feedback provided <FEEDBACK-FOR-CLAUDE-name.md>
+# OR
+npx shipwreck-blog-doctor attest-feedback none-needed "<honest reason — must be ≥10 chars>"
+```
+
+Each subcommand requires concrete proof: `attest-phase9` requires the answers JSON with all 5 expected keys; `attest-feedback provided` requires the file to exist; `attest-feedback none-needed` requires a non-trivial reason string. Agents cannot bypass these.
+
+### Doctor: default mode is now the closeout gate
+
+**Reversed**: previously `--final` was opt-in; now default mode IS `--final` equivalent. Reflexive `npm run doctor` runs the gate. Three new modes for intermediate use during development:
+
+- `--preflight` — install-level only (engine resolves, file: deps OK)
+- `--lite` — technical only (no procedural gates) — for development checks
+- `--skip-build` — skip the build step (faster)
+
+Default mode (no flags) = full closeout gate. Agents who want to "check status during development" use `--lite`.
+
+### Doctor: `print-completion` subcommand
+
+```bash
+npx shipwreck-blog-doctor print-completion
+```
+
+Re-runs the full default doctor gate (must pass) AND emits a canonical audit-trail block on stdout. The skill now mandates: agent's reply to user must include this stdout VERBATIM as the completion section. Removes the "I'll compose my own status message" failure mode — there is no path to declaring done other than running this command and pasting its output.
+
+### Doctor: Phase 7a host-side footer-link check
+
+Default mode now walks up from `_blog/` to the site repo root and greps HTML/Astro/template files for a `<a href="/blog">` link. If absent, fatal — the blog is invisible from the host without the footer link.
+
+### Skill rewrite
+
+Final-checkpoint section completely replaced. New structure:
+
+1. Step 1: attest Phase 9 (with subcommand)
+2. Step 2: attest nav link decision (with subcommand)
+3. Step 3: attest feedback status (with subcommand)
+4. Step 4: run default doctor — verify it passes
+5. Step 5: run `print-completion` — paste stdout VERBATIM into reply
+
+The "Failure modes to watch for" list adds: "User said go ahead, so I'll do all phases at once and tell them" and "I'll write my own status message — print-completion is just for show."
+
+### Integration test (acceptance CI)
+
+Added 6 new assertions:
+- Default doctor blocks completion without Phase 9 attestation
+- Default doctor blocks completion without feedback attestation
+- Default doctor blocks completion without nav-link attestation
+- `--lite` mode correctly skips procedural gates
+- `attest-*` subcommands write to state file
+- State file contains all three attestations after running attest-* commands
+
+42/42 checks passing on v0.3.6 tree.
+
+### OpenClaw-side complement (for Nyxi specifically)
+
+The engine-side gates above prevent declaring done without the work. To prevent Nyxi from forgetting the gates exist in the first place, the user is installing a hard-rule snippet in `~/.openclaw/workspace/AGENTS.md` plus a `~/.openclaw/skills/shipwreck-final-gate/SKILL.md` skill. These are runtime-sticky across `/new` resets and inject the completion contract into Nyxi's context before any project doc is read. Drafts provided in this session.
+
+### Migration from 0.3.5
+
+For agents continuing work on a 0.3.5 site:
+- The old `--final --phase9-confirmed --feedback-status=...` invocation no longer works (those flags were removed). Use the new `attest-*` subcommands instead.
+- Consumer sites need no template changes — only behavior changes are in the engine packages (`@shipwreck/blog-core` doctor binary).
+- Run `npm update @shipwreck/blog-core` to pick up the new doctor.
+
 ## [0.3.5] - 2026-04-29
 
 **Architectural simplification** — eliminates the per-site blog repo concept entirely. Blog source now lives inside the host site's repo at `_blog/`. Removes ~5 moving parts per integration. Per the project's patch-only versioning rule this stays 0.3.x; under strict SemVer it would be a minor or major bump (it's a breaking change to the integration model). Existing sites can migrate by moving `_blog/` into their host repo + redeploying via the host's existing pipeline.

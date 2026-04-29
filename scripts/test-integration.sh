@@ -280,18 +280,55 @@ else
   fail "Doctor failed to confirm cascade order — check the heuristic"
 fi
 
-# --final gate must require Phase 9 + feedback flags
-FINAL_OUT=$(npm run doctor -- --final --skip-build 2>&1 || true)
-if echo "$FINAL_OUT" | grep -q "Phase 9 questions not confirmed"; then
-  ok "Doctor --final correctly blocks completion without --phase9-confirmed"
+# Default doctor mode (the closeout gate as of v0.3.6) must require attestations
+DEFAULT_OUT=$(npm run doctor -- --skip-build 2>&1 || true)
+if echo "$DEFAULT_OUT" | grep -q "Phase 9 not attested"; then
+  ok "Default doctor blocks completion without Phase 9 attestation"
 else
-  fail "Doctor --final did NOT enforce --phase9-confirmed flag"
+  fail "Default doctor did NOT enforce Phase 9 attestation"
 fi
-if echo "$FINAL_OUT" | grep -q "Feedback status not declared"; then
-  ok "Doctor --final correctly blocks completion without --feedback-status"
+if echo "$DEFAULT_OUT" | grep -q "Feedback status not attested"; then
+  ok "Default doctor blocks completion without feedback attestation"
 else
-  fail "Doctor --final did NOT enforce --feedback-status flag"
+  fail "Default doctor did NOT enforce feedback attestation"
 fi
+if echo "$DEFAULT_OUT" | grep -q "Phase 7b nav link decision not attested"; then
+  ok "Default doctor blocks completion without nav-link attestation"
+else
+  fail "Default doctor did NOT enforce nav-link attestation"
+fi
+
+# --lite mode skips procedural gates (technical only — for development use)
+LITE_OUT=$(npm run doctor -- --lite --skip-build 2>&1 || true)
+if echo "$LITE_OUT" | grep -q "Phase 9 not attested"; then
+  fail "--lite mode incorrectly enforced Phase 9 (should skip procedural gates)"
+else
+  ok "--lite mode correctly skips procedural gates (technical-only)"
+fi
+
+# attest-* subcommands write to state file
+TEST_STATE_DIR=$(mktemp -d -t shipwreck-attest-test-XXXX)
+cp "$TEST_SITE/node_modules/.bin/shipwreck-blog-doctor" "$TEST_STATE_DIR/" 2>/dev/null || true
+cd "$TEST_STATE_DIR"
+node "$ENGINE_REPO/packages/blog-core/bin/doctor.mjs" attest-phase9 '{"latest3Callout":"no","rssFooterLink":"no","gscSubmission":"no","crossLinks":"none","sveltiaCMS":"no"}' > /dev/null 2>&1
+node "$ENGINE_REPO/packages/blog-core/bin/doctor.mjs" attest-feedback none-needed "Integration test fixture; no real feedback" > /dev/null 2>&1
+node "$ENGINE_REPO/packages/blog-core/bin/doctor.mjs" attest-nav-link declined > /dev/null 2>&1
+if [[ -f "$TEST_STATE_DIR/.shipwreck-integration-state.json" ]]; then
+  ok "attest-* subcommands write to .shipwreck-integration-state.json"
+else
+  fail "attest-* subcommands did NOT create state file"
+fi
+# Verify state file has all three attestations
+STATE=$(cat "$TEST_STATE_DIR/.shipwreck-integration-state.json")
+if echo "$STATE" | grep -q '"asked": true' && \
+   echo "$STATE" | grep -q '"status": "none-needed"' && \
+   echo "$STATE" | grep -q '"decision": "declined"'; then
+  ok "State file contains all three attestations (phase9, feedback, navLink)"
+else
+  fail "State file missing expected attestations"
+fi
+rm -rf "$TEST_STATE_DIR"
+cd "$TEST_SITE"
 
 # ---------- summary ----------
 
