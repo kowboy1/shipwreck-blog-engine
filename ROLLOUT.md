@@ -1,3 +1,7 @@
+> ⚠️ **STOP** — if you are an agent and havent read [AGENTS.md](AGENTS.md) yet, read that first.
+> This file is referenced FROM the agent runbook in `AGENTS.md`, not a starting point.
+> Continue here only if `AGENTS.md` routed you to this file.
+
 # Engine Rollout — How Updates Reach Every Site
 
 **Question:** when we fix a bug or ship a feature in `@shipwreck/blog-core`, how does it reach every site we've ever deployed the engine to?

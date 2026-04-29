@@ -4,6 +4,9 @@ description: Integrate the Shipwreck Blog Engine into a host site. Triggers when
 
 # Skill — Integrate Shipwreck Blog into a Host Site
 
+> ⚠️ **STOP** — if you opened this directly without reading [AGENTS.md](../../AGENTS.md), go read AGENTS.md first.
+> AGENTS.md contains the universal rules every agent must follow before starting any job. This file is the runbook AGENTS.md routes you to for the install job.
+
 You are integrating `@shipwreck/blog-engine` into a host site. **This skill is hosting-, DNS-, and CDN-agnostic.** It works for any host that can serve static files (every cPanel tier, Plesk, DirectAdmin, OpenLiteSpeed, raw nginx/Apache, S3+CloudFront, Cloudflare Pages, Netlify, Vercel, GitHub Pages, a self-hosted VPS, an old-school FTP-only shared host — anything).
 
 The end state:
@@ -12,7 +15,38 @@ The end state:
 2. The **host site** serves the built blog at `<docroot>/blog/` (or whatever subpath was chosen). For hosts with PHP+cron, `shipwreck-updater.php` runs daily and self-updates. For hosts without PHP, an external runner (or scheduled GitHub Action) pushes the build via SSH/SFTP/FTP.
 3. The blog is **themed to look native** to the host site.
 
-**Don't improvise.** Follow the procedure. Every phase has an output you can verify. If a verification fails, fix that phase before moving on.
+---
+
+## 🚦 Done definition (read this BEFORE starting)
+
+The integration is **NOT done** until ALL of the following are true. If you can't tick every box, the integration isn't done — keep going.
+
+- [ ] Every phase below has its precondition satisfied AND its done-check satisfied
+- [ ] `src/styles/tokens.css` exists with every TOKEN-CONTRACT.md token filled with a host-derived value
+- [ ] `src/components/SiteShell/Header.astro` shows the host's actual nav (not the engine's "Home / Blog" placeholder)
+- [ ] `src/components/SiteShell/Footer.astro` shows the host's actual footer (not the placeholder)
+- [ ] `npm run doctor` reports zero fatal issues (run from the per-site repo)
+- [ ] Visual diff between host homepage and blog page passes <5% per region
+- [ ] `.shipwreck/sites.json` has this site's entry filled in
+- [ ] You have asked the user the **Phase 9 post-install integration questions** (latest-3 callout, RSS link, GSC submission, cross-links, Sveltia CMS) and acted on the answers
+- [ ] Either: a `FEEDBACK-FOR-CLAUDE-<job>.md` exists in the engine repo, OR you have explicitly told the user "no engine feedback this run"
+- [ ] Either: a stack-notes session log exists, OR you have explicitly told the user "no new stack-specific quirks observed"
+
+**If you skip any of these and report "done", the user will catch it.** This isn't paranoia — it's literally what happened on the previous integration. Save them the round-trip.
+
+---
+
+## ⛔ Phase gates (every phase has them — do not skip)
+
+Each phase has:
+- **Precondition** — must be true to *start* the phase. If false, return to the previous phase.
+- **Done-check** — must be true to *finish* the phase. If false, the phase is not done, regardless of what you've already done in it.
+
+Treat these as hard gates. The skill is structured this way because skipping phases produces broken integrations that look superficially OK at first.
+
+---
+
+**Don't improvise.** Follow the procedure. If a precondition or done-check fails, the phase is not in the state you think it is.
 
 ---
 
@@ -94,6 +128,11 @@ If you find yourself committing to the host repo for anything other than the foo
 ---
 
 ## Phase 1 — Create the per-site blog repo
+
+> **Precondition (must be true to start this phase):** All required inputs collected (host name + domain, hosting environment, blog mount path, per-site repo decision, where host's nav and footer live, deploy mode chosen). If any are missing, ask the user OR look up via Harbour Control before starting.
+>
+> **Done-check (must be true before proceeding to the next phase):** Per-site repo exists with demo-site contents copied. file: dep paths in package.json have been updated to the actual relative path to the engine repo (verify with `ls node_modules/@shipwreck/blog-core/package.json` — must show a real file). `npm install` succeeded. `npx shipwreck-blog-doctor --skip-build` reports `✓ Engine package '@shipwreck/blog-core' resolves`. **If the doctor reports the engine package as unreachable, the file: dep path is wrong — fix it before proceeding to Phase 2.**
+
 
 Each blog deployment needs its own GitHub repo for the source. Why a separate repo (not just a directory in the host site's repo): the consumer-site GH Action publishes its own releases, which the host pulls from. Decoupling content from the live site repo keeps deploys clean.
 
@@ -178,6 +217,11 @@ cd _blog && npm install && npm run dev
 
 ## Phase 2 — Extract host design tokens
 
+> **Precondition (must be true to start this phase):** Phase 1 done-check passed (engine packages resolve, doctor green on the package check).
+>
+> **Done-check (must be true before proceeding to the next phase):** `src/styles/tokens.css` exists. Every token listed in [TOKEN-CONTRACT.md](../../packages/blog-theme-default/TOKEN-CONTRACT.md) has a host-derived value (not an engine default). The file is imported from BaseLayout.astro. **If any token is still at engine default, the integration will look wrong.**
+
+
 You're filling out [TOKEN-CONTRACT.md](../../packages/blog-theme-default/TOKEN-CONTRACT.md). The contract enumerates every theming token the engine exposes — your job is to fill each with a host-correct value.
 
 ### 2a — Source the values
@@ -212,6 +256,11 @@ Run through the [Validation checklist](../../packages/blog-theme-default/TOKEN-C
 
 ## Phase 3 — Port the SiteShell (header + footer)
 
+> **Precondition (must be true to start this phase):** Phase 2 done — `src/styles/tokens.css` exists with every contract token filled.
+>
+> **Done-check (must be true before proceeding to the next phase):** `src/components/SiteShell/Header.astro` contains the host's actual nav (NOT the engine placeholder). `src/components/SiteShell/Footer.astro` contains the host's actual footer (NOT the placeholder). Neither file contains the comment `Replace this with the host site's...`. **`npm run doctor` does NOT flag SiteShell as still placeholder — if it does, Phase 3 is not done.**
+
+
 Copy the host's existing header/footer markup into:
 - `_blog/src/components/SiteShell/Header.astro`
 - `_blog/src/components/SiteShell/Footer.astro`
@@ -229,6 +278,11 @@ If the host loads Google Fonts via `<link>` in `<head>`, port the same `<link>` 
 
 ## Phase 4 — Custom CTAs (optional)
 
+> **Precondition (must be true to start this phase):** Phase 3 done — SiteShell components ported.
+>
+> **Done-check (must be true before proceeding to the next phase):** Either: the user wanted custom CTAs and they exist in `src/components/cta/` + are registered in `cta/registry.ts` + are referenced in `site.config.ts`; OR the user declined custom CTAs and `site.config.ts` `ctaBlocks.default` is set to a sensible default for the host (or removed if no CTA is needed). **Do not leave the demo-site default `"book-consult"` if the host isn't a consulting business.**
+
+
 If the host has a primary CTA the blog should reuse, create `_blog/src/components/cta/<CtaName>.astro` and register it in `site.config.ts`:
 
 ```ts
@@ -245,6 +299,11 @@ Buttons read tokens (`--button-bg`, `--button-radius`, etc.), so they should mat
 ---
 
 ## Phase 5 — Build & visual verification
+
+> **Precondition (must be true to start this phase):** Phases 1–4 all done.
+>
+> **Done-check (must be true before proceeding to the next phase):** `npm run build` succeeds with zero errors. `dist/` exists and contains an `_astro/*.css` file. `scripts/visual-diff.mjs` against the live host returns <5% diff per region. **`npm run doctor` from the per-site repo reports zero fatal issues** (warnings are acceptable but should be reviewed). If any check fails: STOP, fix, re-verify. Do not proceed to Phase 6 with a half-themed blog — once deployed it's harder to roll back.
+
 
 ```bash
 cd _blog
@@ -282,6 +341,11 @@ mkdir -p .shipwreck/goldens/<site-name>/
 ---
 
 ## Phase 6 — Deploy & enable self-update
+
+> **Precondition (must be true to start this phase):** Phase 5 done — doctor green, visual diff passed, `dist/` ready.
+>
+> **Done-check (must be true before proceeding to the next phase):** For Mode A: per-site repo pushed; CI built and published a release tarball; `shipwreck-updater.php` installed on host with cron registered; `curl https://<domain>/shipwreck-updater.php?token=…` reports `{"ok":true}` and `/blog/` renders the themed blog in the browser. For Mode B: `dist/` copied to `<host-checkout>/blog/`; local serve confirms `/blog/` renders correctly. For Mode C: build pushed via rsync/sftp; live `/blog/` URL renders.
+
 
 Commit and push the **per-site blog repo** (NOT the host site repo — see "Critical model concept" at the top). The included GH Action will build automatically on push and create a `blog-dist.tar.gz` release.
 
@@ -361,6 +425,11 @@ Verify in the browser: `https://<domain>/blog/` should now render. If it 404s, r
 
 ## Phase 7 — Wire the blog into the host site
 
+> **Precondition (must be true to start this phase):** Phase 6 done — blog reachable at `/blog/` and renders with host theme.
+>
+> **Done-check (must be true before proceeding to the next phase):** Footer link to `/blog/` added to the host site's footer (test by loading host homepage, scroll to footer, click — `/blog/` loads). Nav link decision applied: either added to host nav (if user wanted) or explicitly skipped. `robots.txt` on host has `Sitemap: https://<domain>/blog/sitemap-index.xml`. **The blog must be discoverable from the host site — without these wirings it's invisible.**
+
+
 This is the step that makes the blog **discoverable**. Without it, the blog is technically live but invisible — no link from anywhere on the host site to `/blog/`.
 
 You're editing the **host site repo** (NOT the per-site blog repo). These are the only host-repo edits the integration should ever make:
@@ -407,6 +476,11 @@ These are NOT default integration tasks — only do them if Phase 9 questions tr
 
 ## Phase 8 — Register & monitor
 
+> **Precondition (must be true to start this phase):** Phase 7 done — host wiring complete.
+>
+> **Done-check (must be true before proceeding to the next phase):** `.shipwreck/sites.json` in the engine repo has this site's entry with `engineVersion`, `domain`, `deploy.method`, `source.repo`, `cdn.*` filled. Uptime monitor created on the user's monitoring system (or explicitly skipped per the user's instruction). Topic note in the user's vault (or equivalent) updated with engine version + integration date + any quirks.
+
+
 1. **Add to site registry.** Edit `<engine-repo>/.shipwreck/sites.json`, append the new site entry. Set `engineVersion` to the version that's installed (read from `https://<domain>/shipwreck-updater.php?token=…&action=status`). Commit + push the engine repo.
 
 2. **Add an Uptime Kuma monitor** for the status endpoint:
@@ -425,6 +499,11 @@ These are NOT default integration tasks — only do them if Phase 9 questions tr
 ---
 
 ## Phase 9 — Post-install integration questions (ASK the user)
+
+> **Precondition (must be true to start this phase):** Phase 8 done — site registered + monitored.
+>
+> **Done-check (must be true before proceeding to the next phase):** Every question in the list below has been asked of the user, and their answer has been acted on (work done now) or logged as a deferred follow-up in the site's vault topic note. **Do not skip the questions — they're the difference between a blog that just exists and a blog that's actually integrated into the site's discovery, content, and ops.**
+
 
 After verifying the blog is live and themed correctly, ask the user about optional integrations. **Don't assume** — present each as a question. The user may want some, none, or all:
 
@@ -482,4 +561,38 @@ The site is now fully self-updating. Future engine releases auto-propagate throu
 4. Host's daily cron picks up the release within 24h, atomically swaps to new version
 5. Cloudflare cache purged automatically
 
-**Nothing else for us to do per release** unless something breaks. If something breaks: visual-diff in the GH Action will catch it (TODO: wire that in), or Uptime Kuma will catch the keyword regression, or someone notices.
+**Nothing else for us to do per release** unless something breaks. If something breaks: visual-diff in the GH Action will catch it (TODO: wire that in), uptime monitors will catch the keyword regression, or someone notices.
+
+---
+
+## 🛑 Before you report "done" to the user — final blocking checkpoint
+
+Run this checklist top-to-bottom. **Every box must be ticked.** If any box can't be ticked, the integration isn't done — go back and finish.
+
+```
+[ ] All 9 phases above have their done-check satisfied
+[ ] `npm run doctor` from the per-site repo — output shows zero ✗ (fatal) issues
+[ ] Visit https://<domain>/blog/ in a browser — page loads and visually matches the host
+[ ] Visit https://<domain>/blog/<a-post-slug>/ — post page renders with proper H1, ToC, header, footer
+[ ] .shipwreck/sites.json has this site's entry (Phase 8)
+[ ] All Phase 9 questions have been asked, answers acted on or logged
+[ ] One of: FEEDBACK-FOR-CLAUDE-<job>.md exists in engine repo, OR you have explicitly told the user "no engine feedback this run"
+[ ] One of: stack-notes session log written, OR you have explicitly told the user "no new stack-specific quirks observed"
+```
+
+**If you skip this checkpoint and report done, the user will catch it and ask you to redo.** Specifically: they will run `npm run doctor` themselves, see fatal issues, and the trust round-trip costs more than the 60 seconds it takes to run through this checklist.
+
+When you report done, your status message should include:
+
+```
+Integration done. Verifications:
+- npm run doctor: ✓ all checks passed
+- Visual diff: ✓ <X% per region
+- Live URL: https://<domain>/blog/ rendering correctly
+- Registry: .shipwreck/sites.json updated
+- Phase 9 questions: asked, [N] follow-ups logged
+- Engine feedback: [link to FEEDBACK doc OR "no feedback this run"]
+- Stack quirks: [link to stack-notes log OR "no new quirks observed"]
+```
+
+That status message is the user's audit trail. Without it, they don't know you actually verified — they just know you said you did.

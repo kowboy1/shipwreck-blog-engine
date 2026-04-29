@@ -1,3 +1,7 @@
+> ⚠️ **STOP** — if you are an agent and havent read [AGENTS.md](AGENTS.md) yet, read that first.
+> This file is referenced FROM the agent runbook in `AGENTS.md`, not a starting point.
+> Continue here only if `AGENTS.md` routed you to this file.
+
 # Contributing
 
 How to work on the Shipwreck Blog Engine.

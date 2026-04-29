@@ -1,8 +1,71 @@
+> ⚠️ **STOP** — if you are an agent and havent read [AGENTS.md](AGENTS.md) yet, read that first.
+> This file is referenced FROM the agent runbook in `AGENTS.md`, not a starting point.
+> Continue here only if `AGENTS.md` routed you to this file.
+
 # Changelog
 
 All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](https://keepachangelog.com). Versioning: [SemVer](https://semver.org).
 
 ## [Unreleased]
+
+## [0.3.2] - 2026-04-29
+
+Patch release fixing the symlink/scan bug that v0.3.1 only partially fixed, plus the structural agent-doc problems Nyxi's second integration attempt revealed (skipped phases, no entrypoint discipline, no preflight verification).
+
+### Engine bug fix (the actual root cause)
+
+v0.3.1 added `pages/**` to the Tailwind preset's content path, but the path was `./node_modules/@shipwreck/blog-core/src/pages/**`. In real per-site installs with `file:` deps, npm creates a symlink at that location, and:
+
+1. The symlink is fragile — wrong number of `../` in the `file:` spec breaks it silently. Nyxi's install had this exact bug (4 `../` instead of 3).
+2. Even when the symlink resolves, Tailwind's content scanner sometimes can't enumerate files through cross-package symlinks reliably.
+3. Astro's vite plugin chokes on cross-package `.astro` imports through symlinks unless `preserveSymlinks: true` is set.
+
+Fix bundle (all required, all together):
+
+- **Demo-site `tailwind.config.ts`** now uses `require.resolve("@shipwreck/blog-core/package.json")` to find the engine's actual on-disk location. Works in every layout (monorepo workspace-hoist, per-site sibling with `file:`, future npm-published) because it uses Node's standard resolution rather than a fragile relative path.
+- **Demo-site `astro.config.ts`** sets `vite.resolve.preserveSymlinks: true` so Astro's vite plugin doesn't double-load .astro files via two different paths.
+- **`@shipwreck/blog-core` `exports`** now includes `"./package.json"` so `require.resolve` can find it without `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+
+CSS output went from 7.7 KB (broken — missing every page-level class) to 30.9 KB (correct — all engine classes compiled).
+
+### `npm run doctor` preflight
+
+New: `@shipwreck/blog-core` ships a `bin/doctor.mjs` registered as `shipwreck-blog-doctor`. Demo-site has `npm run doctor` wired up. Doctor checks:
+
+- Engine packages resolve (with parent-dir walk to handle workspace hoisting)
+- `site.config.ts` exists; warns on demo-default placeholder values
+- `src/styles/tokens.css` exists (Phase 2 done)
+- `src/components/SiteShell/Header.astro` and `Footer.astro` are NOT still the engine placeholder (Phase 3 done)
+- `npm run build` succeeds
+- Built CSS contains all engine page-level utility classes (catches the v0.3.1-style bug)
+
+Doctor is now the gate for declaring an integration done. Skill enforces this.
+
+### Agent-doc structural overhaul
+
+The previous integration runs missed phases despite the skill describing them, because the skill was descriptive (not gate-keeping) and the README was the canonical entrypoint (not respected by every agent). Fixes:
+
+- **`AGENTS.md` is now the canonical agent entrypoint.** Industry-standard convention (agents.md spec — adopted by OpenAI Codex, Aider, Cursor). Contains imperative STOP language, machine-readable instruction comment at top, the routing table, the universal rules, and the end-of-job protocol.
+- **`README.md` is now a human-first overview** that points agents to AGENTS.md.
+- **`CLAUDE.md` is a thin pointer** to AGENTS.md (Claude Code auto-reads CLAUDE.md).
+- **Every other root `.md` (`ARCHITECTURE`, `ROLLOUT`, `INTEGRATION`, `CONTRIBUTING`, `CHANGELOG`, `UPGRADE-GUIDE`, `PROJECT-BRIEF`)** now has a STOP header at the top: "if you're an agent and haven't read AGENTS.md, go there first." Even an agent that grep-picks lands here gets bounced back to the entrypoint.
+- **Integration skill has hard phase gates.** Each of the 9 phases now starts with a **Precondition** (must be true to begin) and ends with a **Done-check** (must be true to proceed). An agent following the skill literally cannot skip a phase without lying about a precondition or done-check.
+- **Done definition at the top** of the skill, not buried at the end. Lists the 9 conditions that must all be true to declare done — including running doctor, running visual-diff, asking Phase 9 questions, writing feedback, etc.
+- **Final blocking checkpoint at end** of skill enumerates the audit-trail status message the agent must emit when reporting done. If they skip this, the user catches it.
+
+### Migration from 0.3.1
+
+Existing 0.3.1 sites need to:
+1. `npm update @shipwreck/blog-core @shipwreck/blog-theme-default`
+2. Replace `tailwind.config.ts` with the v0.3.2 demo-site version (uses `require.resolve`)
+3. Add `vite: { resolve: { preserveSymlinks: true } }` to `astro.config.ts`
+4. `rm -rf node_modules/.cache _blog/dist _blog/.astro`
+5. `npm install && npm run build`
+6. `npm run doctor` to verify
+
+Or: re-copy the demo-site config files (these three are template, not site-specific):
+- `tailwind.config.ts`
+- `astro.config.ts`
 
 ## [0.3.1] - 2026-04-29
 

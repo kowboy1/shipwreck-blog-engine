@@ -1,3 +1,7 @@
+> ⚠️ **STOP** — if you are an agent and havent read [AGENTS.md](AGENTS.md) yet, read that first.
+> This file is referenced FROM the agent runbook in `AGENTS.md`, not a starting point.
+> Continue here only if `AGENTS.md` routed you to this file.
+
 # Integration Guide — Adding the Blog to a Site
 
 This guide is written for both humans and agents. It covers two phases:

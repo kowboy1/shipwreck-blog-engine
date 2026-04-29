@@ -10,6 +10,12 @@ export default defineConfig({
   site: siteConfig.baseUrl,
   base: siteConfig.blogBasePath,
   trailingSlash: "always",
+  // preserveSymlinks: required so Astro's build doesn't choke on cross-package
+  // .astro imports when the engine is installed via file: deps (which create
+  // symlinks). Without this, Astro's vite plugin tries to load the same .astro
+  // file via two different paths (real + symlink) and errors out with
+  // "No cached compile metadata found".
+  vite: { resolve: { preserveSymlinks: true } },
   integrations: [
     shipwreckBlog({ extraRemarkPlugins: [remarkReadingTime] }),
     mdx(),

@@ -1,3 +1,7 @@
+> ⚠️ **STOP** — if you are an agent and havent read [AGENTS.md](AGENTS.md) yet, read that first.
+> This file is referenced FROM the agent runbook in `AGENTS.md`, not a starting point.
+> Continue here only if `AGENTS.md` routed you to this file.
+
 # Shipwreck Blog Engine — Architecture Plan
 
 **Goal:** A drop-in blog engine for any Shipwreck site, where engine updates flow to all sites via `npm update`, but content and branding stay per-site.

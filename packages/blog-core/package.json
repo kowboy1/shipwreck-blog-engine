@@ -1,6 +1,6 @@
 {
   "name": "@shipwreck/blog-core",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Core engine for Shipwreck Blog — schema, components, SEO helpers",
   "type": "module",
   "main": "./src/index.ts",
@@ -12,11 +12,16 @@
     "./components/*": "./src/components/*",
     "./pages/*": "./src/pages/*",
     "./remark/*": "./src/remark/*",
-    "./integration": "./src/integration.ts"
+    "./integration": "./src/integration.ts",
+    "./package.json": "./package.json"
   },
   "files": [
-    "src"
+    "src",
+    "bin"
   ],
+  "bin": {
+    "shipwreck-blog-doctor": "./bin/doctor.mjs"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
