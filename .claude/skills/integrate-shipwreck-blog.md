@@ -18,11 +18,24 @@ You are integrating `@shipwreck/blog-engine` into a host site. The end state:
 
 1. **Host site name and domain** (e.g. "Wollongong Weather", `wollongongweather.com`)
 2. **Server the host runs on** — Prem3, Prem4, Cloudflare Pages, or external (cheap shared cPanel, etc.)
-3. **Where the blog mounts** — usually `/blog/`. Confirm if different.
+3. **Where the blog mounts** — usually `/blog/`. **This is locked in for the life of the site** — internal links bake it in, so moving it later breaks every blog URL. Confirm with the user before proceeding if it's anything other than `/blog/`.
 4. **Cloudflare zone ID** for the domain (look it up in the Cloudflare dashboard) — needed for cache purge after updates
 5. **Whether a per-site GitHub repo exists** for the blog source (if not, you'll create one in Phase 1)
+6. **Where the host site's main nav lives** (which file or component) — needed in Phase 7 to add a "Blog" entry
+7. **Where the host site's footer lives** (which file or component) — needed in Phase 7 to add a "Blog" link
 
 If any are missing, ask. Don't guess.
+
+---
+
+## Critical model concept (read before Phase 1)
+
+Two repos, kept separate:
+
+- **Host site repo** (e.g. `1tronic/wollongong-weather`): the existing live website. The blog is **NOT installed here**. The only changes you make to this repo are: a footer link, a nav link, and optionally a `robots.txt` reference to the blog sitemap. **Do not** add `_blog/` here. **Do not** add `_blog/node_modules` to its `.gitignore`. **Do not** put any blog Astro source here.
+- **Per-site blog repo** (e.g. `1tronic/wollongong-weather-blog`): a SEPARATE GitHub repo containing only the blog source. Its GH Action builds + publishes release tarballs that the host's `shipwreck-updater.php` pulls.
+
+If you find yourself committing to the host repo for anything other than the footer/nav/robots integration in Phase 7, **stop** — you're in the wrong place.
 
 ---
 
@@ -198,23 +211,43 @@ mkdir -p .shipwreck/goldens/<site-name>/
 
 ## Phase 6 — Deploy & enable self-update
 
-Commit and push the per-site repo. The included GH Action will build automatically on push and create a `blog-dist.tar.gz` release.
+Commit and push the **per-site blog repo** (NOT the host site repo — see "Critical model concept" at the top). The included GH Action will build automatically on push and create a `blog-dist.tar.gz` release.
 
 ```bash
+cd ~/projects/<site-name>-blog
 git add -A
 git commit -m "feat: initial blog scaffold for <site-name>"
 git push -u origin main
 ```
 
-Wait for the GH Action to complete (~2 min). Verify a release was published with the tarball asset.
+Wait for the GH Action to complete (~2 min). Verify a release was published on the per-site repo's GitHub Releases page with the tarball asset.
 
-Then on the host server, run the **one-shot installer**:
+### Pre-host-side setup (do these BEFORE running the installer)
+
+These prevent the very common "first update succeeds but `/blog/` returns 404 or a WordPress page" failure mode:
+
+1. **Pre-create the install directory** (some cheap cPanel hosts won't let the updater `mkdir` arbitrary paths the first time):
+   ```bash
+   ssh user@<server>
+   mkdir -p /home/<domain>/public_html/blog
+   ```
+
+2. **Add `.htaccess` rewrite skip BEFORE installing the updater.** If the host serves WordPress (or any framework) at the apex, the existing `.htaccess` likely has `RewriteRule . /index.php [L]` which would catch `/blog/*` requests. Add this **above** any framework rules in the host's `.htaccess`:
+   ```apacheconf
+   # Static blog mount — let Apache serve files directly
+   RewriteRule ^blog/ - [L]
+   ```
+   Test with `curl -I https://<domain>/blog/` — should return `200` (not `404` from WordPress) once the install path has any file in it.
+
+3. **Cloudflare cache rule for `/blog/*`** — recommended add. Phase: `http_request_cache_settings`. When: `(http.request.uri.path matches "^/blog/")`. Action: `cache_level=cache_everything`, `edge_ttl=86400`. The updater purges cache on each successful update.
+
+### Run the one-shot installer
 
 ```bash
-# SSH into the host (Prem3/Prem4/cPanel/anywhere)
-ssh user@<server>
+# SSH into the host (Prem3/Prem4/cPanel/anywhere with shell access)
+# For shell-less cPanel tiers, run install-updater.sh from your machine and SFTP the
+# resulting shipwreck-updater.php + config; or use cPanel's terminal feature if available.
 
-# Run the installer (replace placeholders):
 curl -fsSL https://raw.githubusercontent.com/1tronic/shipwreck-blog-engine/main/scripts/install-updater.sh | bash -s -- \
   --release-repo 1tronic/<site-name>-blog \
   --install-path /home/<domain>/public_html/blog \
@@ -227,29 +260,62 @@ The installer:
 1. Downloads `shipwreck-updater.php` to the host's `public_html/`
 2. Generates a 32-char random token and writes the config to `~/.shipwreck-updater.config.php` (above public_html, never web-served)
 3. Picks a random update minute (0–59) + random hour (23/00/01/02) so this site doesn't poll GitHub at the same minute as every other site
-4. Adds the cron line
+4. Adds the cron line (with `-m 60` curl timeout — sufficient for tarball download; don't drop below `30`)
 5. Prints the resulting status URL + manual-trigger URL
 
 **Trigger the first update manually** to seed `/blog/`:
 ```bash
 curl "https://<domain>/shipwreck-updater.php?token=<TOKEN_FROM_INSTALLER_OUTPUT>"
+# expect: {"ok":true,"updated":true,"from":null,"to":"<engine-version>"}
 ```
 
-Verify in the browser: `https://<domain>/blog/` should now render.
+Verify in the browser: `https://<domain>/blog/` should now render. If it 404s, recheck the `.htaccess` rewrite skip from step 2 above.
 
 ---
 
-## Phase 7 — Apache + Cloudflare hygiene
+## Phase 7 — Wire the blog into the host site
 
-Two checks per site, especially on cPanel hosts where WordPress or another app already runs at the apex:
+This is the step that makes the blog **discoverable**. Without it, the blog is technically live but invisible — no link from anywhere on the host site to `/blog/`.
 
-1. **`.htaccess` doesn't intercept `/blog/*`**
-   Test by `curl https://<domain>/blog/` and confirm it serves the static index.html (not WP). If the WP rewrite catches it, add to `.htaccess` BEFORE WP rules:
-   ```apacheconf
-   RewriteRule ^blog/ - [L]
-   ```
+You're editing the **host site repo** (NOT the per-site blog repo). These are the only host-repo edits the integration should ever make:
 
-2. **Cloudflare cache rule for `/blog/*`** — recommended. Phase: `http_request_cache_settings`. When: `(http.request.uri.path matches "^/blog/")`. Action: `cache_level=cache_everything`, `edge_ttl=86400`. The updater purges cache on each push.
+### 7a — Footer link (required)
+
+Open the host site's footer file/component (the user told you where in the inputs phase). Add a "Blog" link near other footer nav links (Privacy, Terms, etc.). Use the host's existing footer link styling — copy the surrounding markup pattern. Example for a static HTML host:
+
+```html
+... &middot; <a href="/blog/" class="footer-link">Blog</a> &middot; ...
+```
+
+For a React/Vue/Astro host, follow the host's component patterns. Don't add new styles — match what's there.
+
+**Verify:** load the host homepage in a browser, scroll to footer, see "Blog" link, click it → `/blog/` loads correctly.
+
+### 7b — Main nav link (ask the user)
+
+Some sites want "Blog" in the main nav, some prefer footer-only. Ask:
+
+> "Want to add a 'Blog' link to the main nav on the homepage as well? Some sites prefer footer-only to keep the nav clean."
+
+If yes: open the host's nav file/component, add the link in the host's existing nav-item style. Place it sensibly — usually after content nav items, before any login/CTA buttons. Verify in browser.
+
+### 7c — `robots.txt` reference to blog sitemap (recommended)
+
+The blog auto-generates `/blog/sitemap-index.xml` listing every post. Add it to the host's `robots.txt` so search engines find it:
+
+```
+Sitemap: https://<domain>/blog/sitemap-index.xml
+```
+
+(Place at the bottom of `robots.txt` alongside any existing `Sitemap:` lines.)
+
+### 7d — Skip these unless the user asks
+
+These are NOT default integration tasks — only do them if Phase 9 questions trigger them:
+
+- Latest-3-posts callout on the homepage (requires fetching `/blog/posts.json` at host build time)
+- RSS link in footer pointing at `/blog/rss.xml`
+- Cross-linking individual blog posts from other host pages
 
 ---
 
@@ -272,6 +338,35 @@ Two checks per site, especially on cPanel hosts where WordPress or another app a
 
 ---
 
+## Phase 9 — Post-install integration questions (ASK the user)
+
+After verifying the blog is live and themed correctly, ask the user about optional integrations. **Don't assume** — present each as a question. The user may want some, none, or all:
+
+1. **"Want a 'Latest 3 posts' callout on the homepage?"**
+   The blog publishes `/blog/posts.json` listing every post. We can wire a small fetch into the host's homepage build that pulls the most recent 3 and renders them as cards. If yes, ask where on the homepage they should appear.
+
+2. **"Want an RSS feed link in the footer pointing to `/blog/rss.xml`?"**
+   The blog auto-generates RSS. Adding a discoverable link helps RSS readers + some AI crawlers find it.
+
+3. **"Should I submit `https://<domain>/blog/sitemap-index.xml` to Google Search Console?"**
+   If the user has the GSC property already verified, you can do this through GSC API or just give them the URL to add manually. Same for Bing Webmaster Tools.
+
+4. **"Are there specific host pages that should cross-link to specific blog posts?"**
+   E.g., for wollongong-weather, the suburb pages might reference relevant blog posts ("See our guide on East Coast Lows" on the Thirroul page). Get a list, then either edit the host repo or note for later.
+
+5. **"Want me to set up a content-writer onboarding doc for whoever writes posts going forward?"**
+   Points them at the `add-shipwreck-blog-post` skill (for agents) or the Sveltia CMS at `/blog/admin/` (for humans).
+
+6. **"Any host pages that mention 'articles', 'guides', or 'news' but don't link to the blog yet?"**
+   Quick grep through the host repo — `grep -ri "articles\|guides\|news" --include='*.html' --include='*.astro'` — surfaces missed link opportunities.
+
+7. **"Want to enable Sveltia CMS at `/blog/admin/` for non-dev editing?"**
+   Already pre-wired in the engine. Just needs the user to fill in `_blog/public/admin/config.yml` with their GitHub repo + branch + register a GitHub OAuth app. See `INTEGRATION.md` Part 4 for steps.
+
+For each "yes", do the work and verify. For each "no" or "later", log it in the site's vault topic note as a deferred follow-up.
+
+---
+
 ## Common failure modes
 
 | Symptom | Cause | Fix |
@@ -284,6 +379,10 @@ Two checks per site, especially on cPanel hosts where WordPress or another app a
 | Updater says `github_unreachable` | Outbound HTTPS blocked on the host | Most cPanel hosts allow it. If blocked, contact host or use Path B (SSH push) |
 | Updater says `sha256_mismatch` | Tarball corrupted or release notes don't include the SHA line | Check the per-site repo's GH Action output. The build workflow writes the SHA into the release body automatically — if it's missing, the workflow file may be out of date |
 | `403 Forbidden` from updater URL | Wrong token | Read it from `~/.shipwreck-updater.config.php` |
+| First `/blog/` request returns 404 or WordPress page | Host `.htaccess` is rewriting `/blog/*` to the framework before Apache serves the static file | Add `RewriteRule ^blog/ - [L]` ABOVE existing rewrite rules in `.htaccess` (Phase 6 pre-step) |
+| Updater can't `mkdir` the install path on first run | cPanel restricts `mkdir` from PHP for some paths | Pre-create the install directory via shell/SFTP (Phase 6 pre-step) |
+| Blog deployed but unreachable from the host site | Forgot Phase 7 — no footer/nav link added | Add the footer link (Phase 7a, required); ask about main nav (7b) |
+| Engine version drift across sites (some on 0.2.0, others on 0.3.0) | Per-site GH Action didn't run on engine release | Check that `SHIPWRECK_DISPATCH_PAT` secret is set on the engine repo with `repo` scope; manually trigger via `gh workflow run release-dispatch.yml -f version=0.3.0` |
 
 ---
 
