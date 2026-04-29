@@ -15,6 +15,14 @@ backend:
   # for the github backend in modern Sveltia. If you need a custom auth proxy,
   # set base_url and auth_endpoint here.
 
+# Branding on the login screen + chrome.
+# - logo_url: shown on the login screen. Pre-resized to 400px wide / 187px tall
+#   PNG (40 KB) so Sveltia displays it at the intended size without runtime CSS
+#   overrides. Replace the file at public/admin/shipwreck-blog-engine-logo.png
+#   to rebrand per-site.
+# - site_url / display_url further down — set per site.
+logo_url: shipwreck-blog-engine-logo.png
+
 # Where Sveltia uploads images. Path is relative to the site repo root.
 media_folder: "public/uploads"
 public_folder: "/uploads"
