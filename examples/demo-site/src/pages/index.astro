@@ -1,47 +1,17 @@
 ---
 import { getCollection } from "astro:content"
-import { buildPostMeta, organizationSchema } from "@shipwreck/blog-core"
-import PostCard from "@shipwreck/blog-core/components/PostCard.astro"
-import Pagination from "@shipwreck/blog-core/components/Pagination.astro"
+import { prepareIndexPage } from "@shipwreck/blog-core"
+import ListingPage from "@shipwreck/blog-core/pages/ListingPage.astro"
 import BaseLayout from "../layouts/BaseLayout.astro"
 import siteConfig from "../../site.config"
 
-const allPosts = await getCollection("posts", ({ data }) => data.status === "published")
-const sorted = allPosts.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf())
-
-const perPage = siteConfig.layout.postsPerPage
-const totalPages = Math.max(1, Math.ceil(sorted.length / perPage))
-const pagePosts = sorted.slice(0, perPage)
-
-const url = new URL(siteConfig.blogBasePath, siteConfig.baseUrl).toString()
-const meta = buildPostMeta({
-  post: {
-    title: `${siteConfig.siteName} — Blog`,
-    metaDescription: `Latest posts from ${siteConfig.siteName}`,
-    publishDate: new Date(),
-    status: "published",
-    tags: [],
-    noindex: false,
-    featured: false,
-    sticky: false,
-    articleType: "BlogPosting",
-  },
-  siteConfig,
-  url,
-})
+const all = await getCollection("posts", ({ data }) => data.status === "published")
+const sorted = all.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf())
+const perPage = siteConfig.layout?.postsPerPage ?? 10
+const total = Math.max(1, Math.ceil(sorted.length / perPage))
+const data = prepareIndexPage({ posts: sorted.slice(0, perPage), siteConfig, page: 1, total })
 ---
 
-<BaseLayout meta={{ ...meta, og: { ...meta.og, type: "website" } }} jsonLd={organizationSchema(siteConfig)}>
-  <div class="mx-auto max-w-3xl">
-    <h1 class="font-heading text-4xl font-bold text-primary">Blog</h1>
-    <div class="mt-8 space-y-6">
-      {pagePosts.map((post) => (
-        <PostCard
-          post={post}
-          basePath={siteConfig.blogBasePath}
-        />
-      ))}
-    </div>
-    <Pagination current={1} total={totalPages} basePath={siteConfig.blogBasePath} />
-  </div>
+<BaseLayout meta={data.meta} jsonLd={data.jsonLd}>
+  <ListingPage data={data} siteConfig={siteConfig} />
 </BaseLayout>

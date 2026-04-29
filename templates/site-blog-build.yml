@@ -1,0 +1,89 @@
+# Per-site blog build workflow.
+#
+# Copy this file into your consumer site repo at
+# `.github/workflows/blog-build.yml` during integration. It builds the blog
+# whenever:
+#   - someone pushes content/template changes (push to main touching _blog/**)
+#   - the engine releases a new version (repository_dispatch from
+#     shipwreck-blog-engine/.github/workflows/release-dispatch.yml)
+#   - someone triggers it manually (workflow_dispatch)
+#
+# Output: attaches `blog-dist.tar.gz` to a GitHub Release on this repo.
+# The host's shipwreck-updater.php cron polls THIS repo's releases and pulls
+# the tarball when a newer one appears.
+
+name: Build blog
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "_blog/**"
+      - ".github/workflows/blog-build.yml"
+  repository_dispatch:
+    types: [shipwreck-engine-update]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    # needed to create releases
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: _blog/package-lock.json
+
+      - name: Install
+        working-directory: _blog
+        run: npm install --no-audit --no-fund
+
+      - name: Update engine packages (always pull latest)
+        working-directory: _blog
+        run: |
+          npm update @shipwreck/blog-core @shipwreck/blog-theme-default
+          ENGINE_VERSION=$(node -p "require('@shipwreck/blog-core/package.json').version")
+          echo "ENGINE_VERSION=$ENGINE_VERSION" >> "$GITHUB_ENV"
+
+      - name: Build
+        working-directory: _blog
+        run: |
+          npm run build
+          # Stamp the version into the dist so the updater can read it
+          echo "$ENGINE_VERSION" > dist/.version
+
+      - name: Package dist
+        run: |
+          cd _blog/dist
+          tar -czf "$GITHUB_WORKSPACE/blog-dist.tar.gz" .
+          cd "$GITHUB_WORKSPACE"
+          SHA=$(sha256sum blog-dist.tar.gz | awk '{print $1}')
+          echo "ASSET_SHA256=$SHA" >> "$GITHUB_ENV"
+
+      - name: Compute release tag
+        id: tag
+        run: |
+          STAMP=$(date -u +%Y.%m.%d.%H%M)
+          TAG="blog-v${ENGINE_VERSION}-${STAMP}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create release with dist asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "Blog build ${{ steps.tag.outputs.tag }}"
+          body: |
+            Built blog dist for engine version `${{ env.ENGINE_VERSION }}`.
+
+            Trigger: ${{ github.event_name }}${{ github.event.action && format(' / {0}', github.event.action) || '' }}
+
+            SHA256: ${{ env.ASSET_SHA256 }}
+
+            The host's `shipwreck-updater.php` will pick this up on its next cron run.
+          files: blog-dist.tar.gz
+          draft: false
+          prerelease: false

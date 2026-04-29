@@ -2,175 +2,231 @@
 
 **Question:** when we fix a bug or ship a feature in `@shipwreck/blog-core`, how does it reach every site we've ever deployed the engine to?
 
-**Status:** today, partially. This doc explains what works automatically, what doesn't, and the plan to close the gap.
+**Answer:** **two complementary paths**, both backed by the same site registry.
+
+| | Pull (default — universal) | Push (optional — our own servers) |
+|---|---|---|
+| Trigger | Daily cron on the host | CI / manual command |
+| Tool on the host | `shipwreck-updater.php` | (none) |
+| Tool we run | (none) | `scripts/deploy-blog.mjs` |
+| Works on cheap shared cPanel | ✅ | ❌ (needs SSH/SFTP) |
+| Works on Prem3/Prem4 | ✅ | ✅ |
+| Works on a host we can't SSH into | ✅ | ❌ |
+| Engine→host credentials needed | ✅ none (host pulls) | ❌ SSH key per server |
+| Median update latency | up to 24h | minutes |
+| Setup complexity per site | Low (drop one PHP file + cron) | Medium (configure CI secrets) |
+
+The pull model is the default and the universal answer — it's the one we use everywhere unless there's a reason not to. The push model is an optional fast-path for our own servers when we want a release to ship inside a few minutes.
 
 ---
 
-## What ships through the integration
+## Path A — Pull (the universal model)
 
-When you integrate the engine into a site, two kinds of code end up there:
+Same architecture as a WordPress plugin pulling updates from GitHub: each site polls daily, sees if there's a new build, downloads itself.
 
-| Layer | Lives in | Updates via |
-| --- | --- | --- |
-| **Package code** — schemas, SEO helpers, components (`PostCard`, `ArticleLayout`, `TableOfContents`, etc.), remark plugins, Tailwind preset | `node_modules/@shipwreck/blog-core/`, `node_modules/@shipwreck/blog-theme-default/` | `npm update` |
-| **Template code** — `_blog/src/pages/*.astro`, `astro.config.ts`, `tailwind.config.ts`, `BaseLayout.astro` | The consumer site's repo (copied from `examples/demo-site/` at integration time) | Manual edit per site, OR codemod-PR |
-| **Site code** — `site.config.ts`, `tokens.css`, `SiteShell/Header.astro`, `SiteShell/Footer.astro`, custom CTAs | The consumer site's repo, intentionally bespoke | Never. By design — these are per-site values. |
+### How it works
 
-**The asymmetry is the problem.** Engine fixes that live in package code propagate via `npm update`. Engine fixes that touch template code (most of v0.2.0's bug fixes did — they edited `[...slug].astro` and `astro.config.ts`) are **invisible to existing sites until someone manually patches them**.
+```
+shipwreck-blog-engine                              ← THE ENGINE (this repo)
+  │  - releases tagged vX.Y.Z
+  │  - on tag: GH Action fires repository_dispatch → every registered consumer
+  ▼
+<site>-blog (per-site repo on GitHub)             ← PER-SITE CONTENT REPO
+  │  - holds: site.config.ts, tokens.css, SiteShell/, content/posts/, content/authors/
+  │  - GH Action: builds blog with latest engine when triggered
+  │    Triggers: push to main, repository_dispatch (engine update), or manual
+  │  - Output: tarball of dist/ attached to a GitHub Release (this repo's releases)
+  ▼
+<consumer hosting>                                ← THE HOST (any tier, anywhere)
+     - one file: /public_html/shipwreck-updater.php
+     - one cron: <RANDOM_MIN> <RANDOM_HOUR_23-02> * * * curl ...?token=...
+     - script: read installed version → check repo's latest release →
+       if newer, download tarball → atomic swap → optionally purge Cloudflare
+```
 
----
+The host doesn't run Node, doesn't need SSH, doesn't need git. It's PHP + cron — every cPanel ships with both.
 
-## What we have today
+### Random cron timing (why it matters)
 
-| Capability | Status |
-| --- | --- |
-| Per-site static build (no central runtime) | ✅ Established |
-| Engine consumed as npm package (`@shipwreck/blog-core`, `@shipwreck/blog-theme-default`) | ✅ Established |
-| Tailwind preset auto-registers engine component scan path | ✅ Since v0.2.0 |
-| Versioning + CHANGELOG with migration steps | ✅ Established |
-| `npm update` propagates package-layer fixes | ✅ Works for things in `node_modules` |
-| Template-layer fixes propagate to existing sites | ❌ Manual per site |
-| Visibility into "which sites are on which engine version" | ❌ No registry |
-| Visual regression catch on engine update | ❌ No automation |
+The installer picks a **random minute (0–59) and a random hour from the low-traffic window {23, 0, 1, 2}** when it sets up the cron line. That gives 240 distinct slots so 100+ sites don't all hit GitHub at the same minute. Once chosen, the time stays fixed (so people know when their cron runs); only re-randomized on reinstall.
 
----
+### Atomic + rollback-safe
 
-## Why not a central blog server (multi-tenant SaaS)?
+- Updater extracts new version to `<install>.new`
+- Renames current `<install>` → `<install>.old.<timestamp>`
+- Renames `<install>.new` → `<install>`
+- The site is **never broken** — only ever serves a fully-extracted dist
+- Last 3 `.old.*` retained; `?action=rollback` reverts to the most recent old
 
-It's the obvious "one deploy = all sites updated" answer, and it's wrong for our case:
+### Security
 
-- Loses the static-output benefit (slower TTFB; harder for AI crawlers and traditional SEO)
-- Single point of failure — one outage kills every blog
-- Iframe / fetch / CORS complexity per host
-- Throws away the existing per-site model — every integration would have to be re-done
+- Auth via 32-char shared token in a config file **outside the public path** (`~/.shipwreck-updater.config.php`, not under `public_html/`)
+- HTTPS-only enforced; refuses `http://` requests
+- GitHub release tarball SHA256 verified against the release notes before extract
+- No write access to anything except `<install>` and its siblings
 
-The static, per-site model is one of the engine's actual selling points. Don't trade it.
+### Monitor it
 
----
+- `?action=status` returns JSON with installed vs latest version
+- Add to Uptime Kuma as an HTTP keyword monitor: alert if `"is_current":true` is missing for >7 days
+- Per-site update history in `<install>/.update-log` (one JSON line per event)
 
-## The plan: Hybrid (Package-first + Fan-out automation)
+### Files we ship for this path
 
-Two-layer strategy. **Most fixes ship through `npm update` alone**. The minority that touch templates ship through automated PRs.
+- [scripts/shipwreck-updater.php](scripts/shipwreck-updater.php) — the universal updater (drops on the host)
+- [scripts/install-updater.sh](scripts/install-updater.sh) — one-shot installer that drops the PHP, generates the token + random cron time, prints next steps
+- [.github/workflows/release-dispatch.yml](.github/workflows/release-dispatch.yml) — engine-side: fans out `repository_dispatch` to every registered consumer site repo on engine release
+- [templates/site-blog-build.yml](templates/site-blog-build.yml) — copy into a consumer-site repo at `.github/workflows/blog-build.yml` during integration
 
-### Layer 1 — Maximize the package boundary
+### One-time setup per new site
 
-**Goal:** shrink the per-site template to ONLY things that genuinely vary per site. Everything else moves into `@shipwreck/blog-core`.
+```bash
+# On the consumer host (cheap cPanel, Prem3, Prem4 — anywhere):
+curl -fsSL https://raw.githubusercontent.com/1tronic/shipwreck-blog-engine/main/scripts/install-updater.sh | bash -s -- \
+  --release-repo 1tronic/wollongong-weather-blog \
+  --install-path /home/wollongongweather.com/public_html/blog \
+  --domain wollongongweather.com \
+  --cloudflare-zone-id <ZONE_ID> \
+  --cloudflare-token <CF_TOKEN>
+```
 
-Concrete next moves (each is a future engine PR):
-
-1. **Page renderers move into the package.** Today every site has its own copy of `_blog/src/pages/[...slug].astro`, `index.astro`, `tags/[tag].astro`, etc. — ~200 lines per site that won't auto-update. Refactor each into a default-exported page renderer component in `@shipwreck/blog-core/pages/`. Per-site files shrink to:
-   ```ts
-   ---
-   import PostPage from "@shipwreck/blog-core/pages/PostPage.astro"
-   import siteConfig from "../../site.config"
-   ---
-   <PostPage siteConfig={siteConfig} />
-   ```
-   Now `[...slug].astro` updates through `npm update`.
-
-2. **Astro integration wraps the remark plugins + sitemap config.** Today consumer `astro.config.ts` files manually wire up `remarkReadingTime`, `remarkStripDuplicateH1`, sitemap. Replace with a single integration:
-   ```ts
-   import shipwreckBlog from "@shipwreck/blog-core/integration"
-   integrations: [shipwreckBlog(siteConfig), tailwind({ applyBaseStyles: false })]
-   ```
-   Now adding a new remark plugin to the engine = automatic for every site.
-
-3. **`tailwind.config.ts` becomes a one-liner.** Already mostly there with the preset. Push remaining shared content paths and plugins into the preset.
-
-After layers 1–3, the per-site template is just `site.config.ts` + `tokens.css` + `SiteShell/*` + `cta/*` + a handful of 3-line page wrappers. ~95% of engine code lives in the package and updates atomically.
-
-### Layer 2 — Fan-out automation (Harbour Control v1)
-
-For the residual template-layer changes that DO need to update existing sites:
-
-1. **Site registry.** A file in the engine repo (`.shipwreck/sites.json`) lists every site running the engine:
-   ```json
-   [
-     {
-       "name": "wollongong-weather",
-       "repo": "1tronic/wollongong-weather",
-       "branch": "main",
-       "blogPath": "_blog",
-       "deployedAt": "https://wollongongweather.com/blog/",
-       "engineVersion": "0.2.0"
-     }
-   ]
-   ```
-   Maintained as part of the integration phase (Phase 6 in [the integration skill](.claude/skills/integrate-shipwreck-blog.md)).
-
-2. **Release fan-out workflow.** A GitHub Action triggers when the engine publishes a tag. For each registered site:
-   - Clone the site repo, branch off main
-   - Run `npm update @shipwreck/blog-core @shipwreck/blog-theme-default`
-   - If the release ships a codemod (in `.shipwreck/codemods/<version>/`), apply it
-   - Build the site
-   - Run `scripts/visual-diff.mjs` against pinned golden screenshots for that site
-   - If green, open a PR titled `chore(blog): bump engine to vX.Y.Z`
-   - If red, open a PR with `[manual review]` flag and the diff details
-
-3. **Per-site CI completes the loop.** Each consumer repo's CI:
-   - Runs on PRs touching `_blog/`
-   - Builds the blog
-   - Runs the same `visual-diff.mjs`
-   - Posts pass/fail back to the PR
-   - Auto-merges when green and the PR was opened by the engine bot
-   - Holds for human review otherwise
-
-4. **Codemods for breaking template changes.** When an engine release requires editing per-site template code (e.g. v0.2.0's "remove `defaultImage` prop"), ship a codemod alongside it: `.shipwreck/codemods/0.2.0.mjs`. The fan-out workflow runs it as part of the bump PR. Codemods are simple AST-or-regex transforms — `jscodeshift` for `.astro` is awkward; in practice regex + small parsers covers most cases.
-
-### What this gets us
-
-- **For 95% of fixes (package code):** push engine release → every registered site gets an auto-PR within minutes → CI proves visual stability → auto-merge → site redeploys via its existing pipeline. End-to-end propagation in <1 hour with zero per-site manual work.
-- **For 5% of fixes (template changes):** same flow, with the codemod doing the heavy lifting. Manual review only when visual-diff catches a regression.
-- **For never-propagating concerns (per-site brand/content):** stay per-site. The boundary is intentional.
+After that, the site is self-updating. Done.
 
 ---
 
-## Sequencing — what to build first
+## Path B — Push (for our own SSH-capable hosts)
 
-Don't try to do all of this in one go. Order:
+For sites where we control the server (Prem3, Prem4, Ops), we can also push updates directly without waiting for the daily cron. Two reasons we'd want this:
 
-### Now (blocks zero future work)
-- ✅ Token contract + integration skill + extract-theme + visual-diff (this PR)
-- ⏭ **Site registry** — dump current sites into `.shipwreck/sites.json` even if there's no automation reading it yet. Cheap to maintain, valuable as documentation.
+1. **Faster turnaround** — push a fix at 2pm, see it live at 2:05pm, not 11pm tomorrow.
+2. **First deploy of a new site** — the host doesn't have the blog yet, so there's nothing for the cron to update.
 
-### Next (1–2 weeks of work, unlocks 95% of the win)
-- ⏭ Move page renderers (`[...slug].astro`, `index.astro`, listing pages) into `@shipwreck/blog-core/pages/`. Per-site templates shrink to 3-line wrappers. **This is the biggest single lever** — without it, every fix that touches `[...slug].astro` (which is most fixes) is a manual round of patches.
-- ⏭ Astro integration wraps remark plugins + sitemap + Tailwind config defaults
+The push path uses [scripts/deploy-blog.mjs](scripts/deploy-blog.mjs):
 
-### After that (only when site count > 3)
-- ⏭ Fan-out GitHub Action against the registry
-- ⏭ Per-site CI that builds + visual-diffs
-- ⏭ Codemods directory + harness
+```bash
+node scripts/deploy-blog.mjs --site wollongong-weather             # build + push
+node scripts/deploy-blog.mjs --site wollongong-weather --dry-run   # build + diff only
+node scripts/deploy-blog.mjs --all                                  # all rsync sites
+```
 
-The registry + page-renderer move are worth doing immediately because they pay back on every future fix. The full automation is only worth the build cost when you have ≥3 active sites — which is one Review Removals integration away.
+What it does per site:
 
----
+1. Build the blog locally (uses local source under `source.localPath/_blog/`)
+2. Run [`scripts/visual-diff.mjs`](scripts/visual-diff.mjs) against the live host (with `--diff`)
+3. Push `dist/` via rsync (`deploy.method: "rsync"`) or lftp (`deploy.method: "sftp"`)
+4. Cloudflare cache purge (if `cloudflare.zoneId` configured)
+5. Update `engineVersion` + `lastDeployed` in `.shipwreck/sites.json`
 
-## What this doesn't solve (be honest about it)
-
-- **Branded one-offs.** A site that wants a custom hero layout still needs custom code. The boundary between engine and site is real.
-- **Authentication-gated CMS state.** If two sites diverge on Sveltia config in incompatible ways, the engine can't reconcile them.
-- **Site repos we don't control.** A registered site whose owner doesn't grant CI access to the engine bot has to upgrade manually. Document this in the registry entry.
+The push path is **complementary**, not a replacement, for the pull path. The same site can have both: cron pulls daily for routine updates, push deploys for urgent fixes. The pull model handles the hands-off long-tail; push handles the immediate.
 
 ---
 
-## Registry: bootstrap entry
+## Site registry
 
-Today's known consumer:
+`.shipwreck/sites.json` — single source of truth for every site running the engine.
 
 ```json
 [
   {
     "name": "wollongong-weather",
-    "repo": "1tronic/wollongong-weather",
-    "branch": "main",
-    "blogPath": "_blog",
-    "engineVersion": "0.2.0",
-    "deployedAt": "https://wollongongweather.com/blog/",
+    "domain": "wollongongweather.com",
+    "blogPath": "/blog",
+    "deploy": {
+      "method": "pull",
+      "fallback": "rsync",
+      "server": "prem4",
+      "sshHost": "157.173.210.110",
+      "sshUser": "nyxi",
+      "remotePath": "/home/wollongongweather.com/public_html/blog/"
+    },
+    "source": {
+      "repo": "1tronic/wollongong-weather-blog",
+      "localPath": "/home/rick/projects/wollongong-weather",
+      "blogSourcePath": "_blog"
+    },
+    "cloudflare": {
+      "zoneId": "<zone-id>",
+      "purgeOnDeploy": true
+    },
+    "engineVersion": "0.3.0",
+    "lastDeployed": null,
     "owner": "rick",
-    "notes": "First proof-of-concept integration. Local file: dep during dev; will switch to git+ssh once first site is canonical."
+    "goldenScreenshots": ".shipwreck/goldens/wollongong-weather/",
+    "notes": "Free-form per-site notes — quirks, custom CTAs, etc."
   }
 ]
 ```
 
-Track future integrations here as part of the integration skill's Phase 6.
+Field meanings:
+
+- **`deploy.method`** — `"pull"` (default — host runs the updater cron), `"rsync"` (we push via SSH), `"sftp"` (we push via SFTP, no shell), or `"manual"` (we build, you push).
+- **`deploy.fallback`** — secondary method available. Lets a site use both: pull as default + rsync for urgent.
+- **`deploy.server`** — `prem3` | `prem4` | `ops` | `cloudflare-pages` | `external`. Documentation only — drives nothing automatically.
+- **`source.repo`** — the per-site GitHub repo that holds `_blog/` source and runs the build workflow. Required for `deploy.method: "pull"` (the updater pulls releases from this repo).
+- **`source.localPath`** — local checkout path used by `deploy-blog.mjs --all`. Optional unless `deploy.method` is `rsync`/`sftp`/`manual`.
+- **`engineVersion`** + **`lastDeployed`** — updated automatically by `deploy-blog.mjs` after a successful push. Updated by the consumer build workflow's release tag for pull-deployed sites.
+- **`goldenScreenshots`** — path to pinned visual-diff baselines. Captured during integration Phase 6.
+
+---
+
+## Apache + Cloudflare hygiene
+
+Two things to verify when integrating into Prem3/Prem4 or any cPanel host:
+
+1. **Apache vhost (or `.htaccess`) doesn't catch `/blog/*`.** Most WordPress hosts have `RewriteRule . /index.php [L]` which would route `/blog/anything` to WordPress. Add an early skip:
+   ```apacheconf
+   RewriteRule ^blog/ - [L]
+   ```
+   or rely on Apache serving the static directory before the rewrite (works in most CyberPanel configs by default).
+
+2. **LiteSpeed/Apache cache rules don't apply to `/blog/*`.** Static blog pages don't need server-side cache. Default behavior is fine; only matters if a site has aggressive `cache.set` rules at the LSCache level — exclude `/blog/*` if so.
+
+3. **Cloudflare cache rule for `/blog/*`** (recommended):
+   - Phase: `http_request_cache_settings`
+   - When: `(http.request.uri.path matches "^/blog/")`
+   - Action: `cache_level=cache_everything`, `edge_ttl=86400`, `browser_ttl=3600`
+   - Why safe: it's static HTML/CSS/JS, no auth, no per-user state. The updater purges cache on each push or daily cron update.
+
+The integration skill ([Phase 6](.claude/skills/integrate-shipwreck-blog.md)) runs these checks.
+
+---
+
+## Sequencing (where we are now)
+
+### Done in this work block
+- ✅ Page renderers moved into `@shipwreck/blog-core/pages/` — per-site templates are now ~10-line wrappers
+- ✅ `shipwreckBlog()` Astro integration auto-wires remark plugins
+- ✅ `shipwreck-updater.php` + `install-updater.sh` (universal pull updater)
+- ✅ `deploy-blog.mjs` (push deploy for our own servers)
+- ✅ `release-dispatch.yml` engine-side fan-out workflow
+- ✅ `templates/site-blog-build.yml` per-site build workflow template
+- ✅ Site registry schema + bootstrap entry
+
+### Next (after first end-to-end test of pull path)
+- Per-site repo template generator (`npx create-shipwreck-blog-site` — scaffolds the per-site repo with config + content collections + build workflow already in place)
+- Golden-screenshot capture as part of integration Phase 6
+- Uptime Kuma monitor template for the `?action=status` endpoint
+- `--rollback-on-diff-fail` flag for `deploy-blog.mjs`
+
+### After site count > 5
+- Engine version drift report (which sites are pinned to old versions, why)
+- Auto-purge of `.old.*` dirs older than N days (currently last-3 retention is per-update-event)
+
+---
+
+## Repeating this for future engines
+
+The pattern is portable. Any future static-site engine (a leads dashboard generator, a review platform builder, anything) ships the same bag of pieces:
+
+| Engine ships | Why |
+| --- | --- |
+| Engine source + npm package | Core logic + components |
+| `scripts/<engine>-updater.php` | Same pattern, renamed for the engine |
+| `scripts/install-updater.sh` | Same pattern, takes engine-specific args |
+| `templates/site-build.yml` | Per-site build workflow template |
+| `.github/workflows/release-dispatch.yml` | Engine-side fan-out |
+| `TOKEN-CONTRACT.md` | If themable |
+| `.claude/skills/integrate-<engine>.md` | Agent runbook |
+| `.shipwreck/sites.json` (or equivalent registry) | Source of truth |
+
+The blog engine is the prototype. Once this works end-to-end on one site (Nyxi's upcoming integration of wollongong-weather), the same architecture clones to whatever's next.

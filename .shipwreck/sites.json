@@ -1,12 +1,29 @@
 [
   {
     "name": "wollongong-weather",
-    "repo": "1tronic/wollongong-weather",
-    "branch": "main",
-    "blogPath": "_blog",
-    "engineVersion": "0.2.0",
-    "deployedAt": "https://wollongongweather.com/blog/",
+    "domain": "wollongongweather.com",
+    "blogPath": "/blog",
+    "deploy": {
+      "method": "pull",
+      "fallback": "rsync",
+      "server": "prem4",
+      "sshHost": "157.173.210.110",
+      "sshUser": "nyxi",
+      "remotePath": "/home/wollongongweather.com/public_html/blog/"
+    },
+    "source": {
+      "repo": "1tronic/wollongong-weather-blog",
+      "localPath": "/home/rick/projects/wollongong-weather",
+      "blogSourcePath": "_blog"
+    },
+    "cloudflare": {
+      "zoneId": "TODO_FILL_ON_DEPLOY",
+      "purgeOnDeploy": true
+    },
+    "engineVersion": null,
+    "lastDeployed": null,
     "owner": "rick",
-    "notes": "First proof-of-concept integration. Uses file: dep during dev; switch to git+ssh once first site is canonical."
+    "goldenScreenshots": ".shipwreck/goldens/wollongong-weather/",
+    "notes": "Bootstrap site for the engine. As of 2026-04-29, blog has been REMOVED from this repo so Nyxi can run the new integrate-shipwreck-blog skill from scratch as the first end-to-end test of the integration system. source.repo will be created by Nyxi during integration; until then this is a forward-looking entry."
   }
 ]

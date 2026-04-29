@@ -4,6 +4,82 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-29
+
+### Page renderers moved into the package
+
+The biggest single fix to the rollout problem: per-site `[...slug].astro`, `index.astro`, `tags/[tag].astro`, `categories/[category].astro`, `authors/[author].astro`, and `page/[page].astro` no longer contain the rendering logic. They're now ~10-line wrappers that load data from a content collection and pass it into engine-provided page components:
+
+- `@shipwreck/blog-core/pages/PostPage.astro` — renders the article (header + ToC + body + tags + AuthorBio + sidebar CTA + RelatedPosts)
+- `@shipwreck/blog-core/pages/ListingPage.astro` — renders index, tag, category, author, paginated listings
+- `preparePostPageData()`, `prepareIndexPage()`, `prepareTagPage()`, `prepareCategoryPage()`, `prepareAuthorPage()` — async helpers that compose meta tags, JSON-LD, related-post ranking, breadcrumbs, etc.
+
+Why this matters: most v0.2.0 fixes touched per-site `[...slug].astro` files, which meant every existing site needed manual patching. After 0.3.0, future fixes to the page rendering ship through `npm update` alone. ~95% of engine code now lives in the package.
+
+### Astro integration
+
+New `@shipwreck/blog-core/integration` default export. Replaces hand-wired `markdown.remarkPlugins` arrays in consumer `astro.config.ts`:
+
+```ts
+import shipwreckBlog from "@shipwreck/blog-core/integration"
+integrations: [
+  shipwreckBlog({ extraRemarkPlugins: [remarkReadingTime] }),
+  // ...
+]
+```
+
+The integration auto-registers `remarkStripDuplicateH1`. Future engine remark plugins will be added there once and propagate to every site automatically.
+
+### Theme tokens — full contract
+
+`packages/blog-theme-default/TOKEN-CONTRACT.md` documents every theming token. `tokens.css` expanded from 7 tokens to 38, covering colors (incl. `--color-bg-elevated`, `--color-link-hover`, `--color-focus-ring`), typography (`--font-mono`, `--line-height-base`, `--tracking-heading`), surface (`--radius-button`, `--radius-chip`, `--shadow-card`), buttons (`--button-bg`, `--button-text`, `--button-hover-bg`, `--button-padding-*`, `--button-font-weight`), and header (`--header-bg`, `--header-height`, `--header-border`). Tailwind preset exposes them as utility classes (`bg-bg-elevated`, `ring-focus`, `shadow-card`, `rounded-button`, `font-mono`, etc.).
+
+### Universal self-update system (Path A)
+
+For any host (cheap shared cPanel, Plesk, DirectAdmin — anywhere with PHP + cron):
+
+- `scripts/shipwreck-updater.php` — single-file self-updater the host runs daily via cron. Polls a per-site GitHub repo's releases, atomically swaps installed `dist/` when a newer build is available, keeps last 3 versions for rollback, optionally purges Cloudflare cache.
+- `scripts/install-updater.sh` — one-shot installer. Drops the PHP, generates a 32-char token, picks a random cron minute (0–59) and random hour from {23, 0, 1, 2} so 100+ sites don't all hit GitHub at the same minute, prints next steps.
+- `.github/workflows/release-dispatch.yml` — engine-side: on tag push, fires `repository_dispatch` to every registered consumer-site repo (read from `.shipwreck/sites.json`).
+- `templates/site-blog-build.yml` — copy into a consumer-site repo at `.github/workflows/blog-build.yml`. Triggers on push, repository_dispatch (engine update), or manual. Builds the static blog with latest engine, publishes `blog-dist.tar.gz` as a GitHub Release asset (with SHA256 in the release notes).
+
+### Push-style deploy (Path B)
+
+For our own servers where we have SSH:
+
+- `scripts/deploy-blog.mjs` — `node scripts/deploy-blog.mjs --site <name>` builds locally, optionally runs visual-diff against the live host, pushes `dist/` via rsync (or lftp for SFTP), purges Cloudflare cache, updates the registry.
+
+### Site registry schema
+
+`.shipwreck/sites.json` schema extended:
+- `deploy.method` — `"pull"` (default) | `"rsync"` | `"sftp"` | `"manual"`
+- `deploy.fallback` — secondary method (e.g. `"pull"` default + `"rsync"` for urgent fixes on Prem3/4)
+- `deploy.server`, `deploy.sshHost`, `deploy.sshUser`, `deploy.remotePath` — for push methods
+- `source.repo` — per-site GitHub repo (required for `pull`)
+- `source.localPath`, `source.blogSourcePath` — for push methods
+- `cloudflare.zoneId`, `cloudflare.purgeOnDeploy` — for cache purge
+- `engineVersion`, `lastDeployed` — auto-updated by deploy-blog.mjs (or by the per-site build workflow's release tag)
+- `goldenScreenshots` — path to pinned visual-diff baselines
+
+### Documentation
+
+- `ROLLOUT.md` rewritten — explains both pull and push paths, hosting reality (Prem3/Prem4 + cheap cPanel), Apache/Cloudflare hygiene, sequencing, and how the pattern repeats for future engines
+- `.claude/skills/integrate-shipwreck-blog.md` rewritten as 8-phase agent runbook: per-site repo creation → token extraction → SiteShell port → CTAs → build & visual-verify → deploy via universal updater → Apache/CF hygiene → register & monitor
+
+### Migration (consumers upgrading from 0.2.x)
+
+The shape of per-site files changed. Existing sites need their `_blog/src/pages/*.astro` and `astro.config.ts` updated. Easiest path: re-copy the demo-site page wrappers and astro config, then bump the engine packages. The per-site files in `examples/demo-site/` are now ~10 lines each — diff against your existing files to migrate.
+
+```ts
+// astro.config.ts becomes:
+import shipwreckBlog from "@shipwreck/blog-core/integration"
+// ...
+integrations: [
+  shipwreckBlog({ extraRemarkPlugins: [remarkReadingTime] }),
+  // ...your other integrations
+]
+```
+
 ## [0.2.0] - 2026-04-29
 
 ### Fixed (out-of-the-box presentation)

@@ -1,0 +1,61 @@
+---
+/**
+ * Engine-side listing page renderer. Used by the per-site index, tag,
+ * category, author, and paginated-index pages.
+ *
+ * Per-site usage:
+ *   const data = prepareTagPage({ tag, posts, siteConfig })
+ *   <BaseLayout meta={data.meta} jsonLd={data.jsonLd}>
+ *     <ListingPage data={data} siteConfig={siteConfig} />
+ *   </BaseLayout>
+ */
+import type { ListingPageData } from "./prepareListingPage.js"
+import type { SiteConfig } from "../schemas/site.js"
+import Breadcrumbs from "../components/Breadcrumbs.astro"
+import PostCard from "../components/PostCard.astro"
+import Pagination from "../components/Pagination.astro"
+import AuthorBio from "../components/AuthorBio.astro"
+
+interface Props {
+  data: ListingPageData
+  siteConfig: SiteConfig
+}
+
+const { data, siteConfig } = Astro.props
+const { title, subtitle, crumbs, posts, pagination, author } = data
+---
+
+<div class="mx-auto max-w-3xl">
+  {crumbs.length > 0 && <Breadcrumbs items={crumbs} />}
+
+  <h1 class={`font-heading text-4xl font-bold text-primary${crumbs.length > 0 ? " mt-4" : ""}`}>
+    {title}
+  </h1>
+
+  {subtitle && <p class="mt-2 text-muted">{subtitle}</p>}
+
+  {author && (
+    <AuthorBio
+      author={author}
+      fallbackImage={siteConfig.seo.defaultAuthorAvatar}
+    />
+  )}
+
+  {posts.length === 0 ? (
+    <p class="mt-10 text-muted">No posts here yet.</p>
+  ) : (
+    <div class="mt-8 space-y-6">
+      {posts.map((post) => (
+        <PostCard post={post} basePath={siteConfig.blogBasePath} variant="list" />
+      ))}
+    </div>
+  )}
+
+  {pagination && (
+    <Pagination
+      current={pagination.current}
+      total={pagination.total}
+      basePath={siteConfig.blogBasePath}
+    />
+  )}
+</div>

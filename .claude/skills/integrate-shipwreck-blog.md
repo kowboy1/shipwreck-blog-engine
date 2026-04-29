@@ -1,35 +1,51 @@
 ---
-description: Integrate the Shipwreck Blog Engine into a host site. Triggers when the user says "add the blog", "install shipwreck blog", "drop the blog into <site>", or sets up `@shipwreck/blog-core` for a new property. Produces a themed, building blog at /blog/ that visually matches the host.
+description: Integrate the Shipwreck Blog Engine into a host site. Triggers when the user says "add the blog", "install shipwreck blog", "drop the blog into <site>", or sets up `@shipwreck/blog-core` for a new property. Produces a themed, building blog at /blog/ that visually matches the host AND is self-updating (pulls new engine releases via daily cron).
 ---
 
 # Skill — Integrate Shipwreck Blog into a Host Site
 
-You are integrating `@shipwreck/blog-engine` into a host site. The end state: the host site has a `_blog/` source dir that builds to `/blog/` static output, themed to look native to the host.
+You are integrating `@shipwreck/blog-engine` into a host site. The end state:
 
-**Don't improvise.** Follow the procedure. Every step has an output you can verify. If a verification fails, fix that step before moving on.
+1. A **per-site GitHub repo** (e.g. `1tronic/wollongong-weather-blog`) holds the blog source — site config, theme tokens, SiteShell, content/posts, content/authors. A GitHub Action there builds the static blog and publishes a tarball to GitHub Releases on every engine update.
+2. The **host site server** has `shipwreck-updater.php` + a daily cron that pulls the latest release tarball and atomically swaps it into `<docroot>/blog/`.
+3. The blog is **themed to look native** to the host site and **self-updates** without any further action from us.
+
+**Don't improvise.** Follow the procedure. Every phase has an output you can verify. If a verification fails, fix that phase before moving on.
 
 ---
 
-## Inputs you need from the user
+## Inputs you need from the user before starting
 
-Before starting, confirm:
-
-1. **Host site repo path** (local) or live URL — required
-2. **Where blog mounts** — usually `/blog/` (default). Confirm if different.
-3. **Site name** for branding (e.g. "Wollongong Weather")
-4. **Primary domain** (e.g. `https://wollongongweather.com`)
+1. **Host site name and domain** (e.g. "Wollongong Weather", `wollongongweather.com`)
+2. **Server the host runs on** — Prem3, Prem4, Cloudflare Pages, or external (cheap shared cPanel, etc.)
+3. **Where the blog mounts** — usually `/blog/`. Confirm if different.
+4. **Cloudflare zone ID** for the domain (look it up in the Cloudflare dashboard) — needed for cache purge after updates
+5. **Whether a per-site GitHub repo exists** for the blog source (if not, you'll create one in Phase 1)
 
 If any are missing, ask. Don't guess.
 
 ---
 
-## Phase 1 — Install (mechanical)
+## Phase 1 — Create the per-site blog repo
+
+Each blog deployment needs its own GitHub repo for the source. Why a separate repo (not just a directory in the host site's repo): the consumer-site GH Action publishes its own releases, which the host pulls from. Decoupling content from the live site repo keeps deploys clean.
 
 ```bash
-# from inside the host site repo:
-cp -r <path-to>/shipwreck-blog-engine/examples/demo-site ./_blog
-cd _blog
-npm install
+# Locally:
+mkdir -p ~/projects/<site-name>-blog
+cd ~/projects/<site-name>-blog
+git init -b main
+
+# Copy the demo-site as the starter
+cp -r <path-to>/shipwreck-blog-engine/examples/demo-site/* .
+cp -r <path-to>/shipwreck-blog-engine/examples/demo-site/.* . 2>/dev/null || true
+
+# Copy the per-site build workflow template
+mkdir -p .github/workflows
+cp <path-to>/shipwreck-blog-engine/templates/site-blog-build.yml .github/workflows/blog-build.yml
+
+# Move the site source into _blog/ (the workflow assumes this layout)
+# (the demo-site's contents become the _blog/ contents — check current shape)
 ```
 
 **Edit `_blog/site.config.ts`** with the user's inputs:
@@ -43,11 +59,11 @@ const config: SiteConfig = {
   blogBasePath: "/blog",
   brand: {
     organizationName: "<SITE_NAME>",
-    logoUrl: "/assets/logo.svg",  // confirm path on host
+    logoUrl: "/assets/logo.svg",
   },
   seo: {
-    defaultOgImage: "<BASE_URL>/assets/og-image.png",  // 1200x630 PNG; confirm path
-    locale: "en_AU",  // adjust per site
+    defaultOgImage: "<BASE_URL>/assets/og-image.png",
+    locale: "en_AU",
   },
   layout: {
     postsPerPage: 10,
@@ -57,85 +73,78 @@ const config: SiteConfig = {
     showRelatedPosts: true,
     relatedPostsCount: 3,
   },
-  ctaBlocks: { default: "default" },  // see Phase 4 for custom CTAs
+  ctaBlocks: { default: "default" },
 }
-
 export default config
 ```
 
-**Verify:**
+Push the repo to GitHub:
 ```bash
-npm run dev
-# open http://localhost:4321/blog/
+gh repo create 1tronic/<site-name>-blog --private --source=. --remote=origin --push
 ```
-Should render unstyled blog with the demo MDX post. If yes → Phase 2.
+
+**Verify Phase 1:**
+```bash
+cd _blog && npm install && npm run dev
+# open http://localhost:4321/blog/ — should render unstyled blog with demo MDX post
+```
 
 ---
 
 ## Phase 2 — Extract host design tokens
 
-You're filling out [TOKEN-CONTRACT.md](../../packages/blog-theme-default/TOKEN-CONTRACT.md). The contract enumerates every theming token the engine exposes — your job is to fill each one with a host-site-correct value.
+You're filling out [TOKEN-CONTRACT.md](../../packages/blog-theme-default/TOKEN-CONTRACT.md). The contract enumerates every theming token the engine exposes — your job is to fill each with a host-correct value.
 
 ### 2a — Source the values
 
-**Pick the highest-fidelity source available, in this order:**
+Pick the highest-fidelity source available, in this order:
 
-1. **Host repo Tailwind config** (`tailwind.config.{js,ts,cjs}`) — read `theme.extend.colors`, `fontFamily`, `borderRadius`. Best signal.
+1. **Host repo Tailwind config** — read `theme.extend.colors`, `fontFamily`, `borderRadius`. Best signal.
 2. **Host CSS custom properties** — grep for `:root` and `--color-*` / `--font-*` in any global CSS.
-3. **Host computed styles via browser** — if no repo access (or for verification), use the [extract-theme script](../../scripts/extract-theme.mjs):
+3. **Host computed styles via browser** — if no repo access, run [extract-theme.mjs](../../scripts/extract-theme.mjs):
    ```bash
-   node scripts/extract-theme.mjs https://<host-domain> > _blog/tokens.draft.css
+   node scripts/extract-theme.mjs https://<host-domain> > _blog/src/styles/tokens.draft.css
    ```
-   Or use Chrome MCP if available — navigate to the host, run a `getComputedStyle` snapshot on `body`, `a`, `button.primary`, `h1`, etc.
+   Heuristics are best-effort; review every value before committing.
 
 ### 2b — Write `_blog/src/styles/tokens.css`
 
-Use the [TOKEN-CONTRACT skeleton](../../packages/blog-theme-default/TOKEN-CONTRACT.md#where-to-write-the-values) as the template. Fill **every** token. Don't skip any — leaving a token at the engine default when the host has a different value produces visible mismatch.
+Use the [TOKEN-CONTRACT skeleton](../../packages/blog-theme-default/TOKEN-CONTRACT.md#where-to-write-the-values) as the template. Fill **every** token — leaving one at the engine default when the host has a different value is a visible mismatch.
 
-Then ensure the consumer's `BaseLayout.astro` imports it:
-
+Ensure it loads in `_blog/src/layouts/BaseLayout.astro`:
 ```astro
 ---
 import "../styles/tokens.css"
-import "@shipwreck/blog-theme-default/tokens.css"  // engine fallback (only fills tokens you didn't override)
+import "../styles/global.css"
 ---
 ```
 
-Order matters: load engine fallbacks first, then site overrides — actually the opposite. Load **site tokens.css after** the engine fallback so site values win. Or: skip the engine fallback entirely if your tokens.css is complete (recommended).
-
 ### 2c — Validate every token
 
-Run through the [Validation checklist](../../packages/blog-theme-default/TOKEN-CONTRACT.md#validation-checklist). Each item must be ✓ before moving on.
+Run through the [Validation checklist](../../packages/blog-theme-default/TOKEN-CONTRACT.md#validation-checklist). Every item must be ✓.
 
 ---
 
 ## Phase 3 — Port the SiteShell (header + footer)
 
-The blog renders inside the host's chrome. Copy the host's existing header/footer markup verbatim into:
-
+Copy the host's existing header/footer markup into:
 - `_blog/src/components/SiteShell/Header.astro`
 - `_blog/src/components/SiteShell/Footer.astro`
 
 **Conversion rules:**
 - React/Vue/Nuxt → Astro: `className` → `class`, no JSX expressions, no framework `<Link>` — use plain `<a>`
-- Drop client-only state (search bars, login buttons) unless explicitly needed in the blog context
-- Keep all nav menu items, even ones the blog doesn't link to. Users click through from the blog header back to the host.
-- Add a "Blog" link to the nav if the host doesn't already have one
-- Preserve all utility classes verbatim — they'll resolve correctly because Phase 2 tokens are now in place
+- Drop client-only state (search bars, login buttons) unless the blog needs them
+- Keep all nav menu items intact
+- Add a "Blog" link to the nav if not present
+- Preserve all utility classes verbatim — Phase 2 tokens make them resolve correctly
 
-**Then load any host fonts.** If the host loads Google Fonts via `<link>` in `<head>`, port the same `<link>` into `_blog/src/layouts/BaseLayout.astro` `<head>`.
+If the host loads Google Fonts via `<link>` in `<head>`, port the same `<link>` into `_blog/src/layouts/BaseLayout.astro` `<head>`.
 
 ---
 
 ## Phase 4 — Custom CTAs (optional)
 
-If the host site has a primary CTA the blog should reuse (e.g. "Get a quote", "Book a consult"), create:
-
-`_blog/src/components/cta/<CtaName>.astro`
-
-Match the host's button visually — but since the button now reads `--button-bg` / `--button-radius` / etc. from your tokens, the styling should "just work". Verify after build.
-
-Register in `site.config.ts`:
+If the host has a primary CTA the blog should reuse, create `_blog/src/components/cta/<CtaName>.astro` and register it in `site.config.ts`:
 
 ```ts
 ctaBlocks: {
@@ -146,50 +155,120 @@ ctaBlocks: {
 }
 ```
 
+Buttons read tokens (`--button-bg`, `--button-radius`, etc.), so they should match host visuals automatically once Phase 2 is done.
+
 ---
 
 ## Phase 5 — Build & visual verification
 
 ```bash
 cd _blog
+npm install
 npm run build
 ```
 
-Output goes to `dist/`. The build script copies it to `../blog/` for static serving.
-
-**Run visual verification** — this is non-negotiable, even if you think it looks fine:
+Output goes to `_blog/dist/`. Then verify:
 
 ```bash
-node scripts/visual-diff.mjs <host-homepage-url> http://localhost:4322/blog/
+# Start preview server
+npx astro preview --host 0.0.0.0 --port 4322 &
+
+# Diff against host
+node scripts/visual-diff.mjs https://<host-domain>/ http://localhost:4322/blog/
 ```
 
-(Start `npx astro preview --host 0.0.0.0 --port 4322` first.)
+Any region with >5% pixel diff fails. Fix tokens, rebuild, re-verify. Manual sanity check at minimum:
 
-The script compares header, footer, body typography, and primary CTA between host and blog. Any region with >5% pixel diff fails. Fix tokens, rebuild, re-verify.
-
-**Manual sanity check** at a minimum:
-- [ ] Header looks identical to host (logo, nav items, spacing, colors)
+- [ ] Header looks identical to host (logo, nav, spacing, colors)
 - [ ] Footer looks identical
-- [ ] An inline link in a blog post matches host link color + hover
+- [ ] Inline link in a blog post matches host link color + hover
 - [ ] H1 font matches host H1 (family, weight, tracking)
 - [ ] Body text matches host body (family, size, line-height, color)
 - [ ] Primary CTA button matches host's most prominent CTA
 - [ ] Card border-radius matches host card style
-- [ ] No engine-default colors visible (no royal-blue links if host uses teal, etc.)
+- [ ] No engine-default colors leaking through
+
+**Capture goldens** — once visual verification passes, capture screenshots of the live blog preview as the regression baseline:
+```bash
+mkdir -p .shipwreck/goldens/<site-name>/
+# (capture script TBD — for now, save manual screenshots of post page, index, tag page)
+```
 
 ---
 
-## Phase 6 — Deploy & register
+## Phase 6 — Deploy & enable self-update
 
-Two things ship with deploy:
+Commit and push the per-site repo. The included GH Action will build automatically on push and create a `blog-dist.tar.gz` release.
 
-1. **`/blog/` static output** — ensure it's served at the right path. Check the host's deploy pipeline copies `_blog/dist/` to wherever `/blog/` is served from.
-2. **Site registration** — add this site to the central rollout registry (see [ROLLOUT.md](../../ROLLOUT.md)) so future engine updates can fan out automatically.
-
-After deploy, sanity-check the live page with:
 ```bash
-node scripts/visual-diff.mjs <host-homepage-url> <host-domain>/blog/
+git add -A
+git commit -m "feat: initial blog scaffold for <site-name>"
+git push -u origin main
 ```
+
+Wait for the GH Action to complete (~2 min). Verify a release was published with the tarball asset.
+
+Then on the host server, run the **one-shot installer**:
+
+```bash
+# SSH into the host (Prem3/Prem4/cPanel/anywhere)
+ssh user@<server>
+
+# Run the installer (replace placeholders):
+curl -fsSL https://raw.githubusercontent.com/1tronic/shipwreck-blog-engine/main/scripts/install-updater.sh | bash -s -- \
+  --release-repo 1tronic/<site-name>-blog \
+  --install-path /home/<domain>/public_html/blog \
+  --domain <domain> \
+  --cloudflare-zone-id <ZONE_ID> \
+  --cloudflare-token <CF_API_TOKEN>
+```
+
+The installer:
+1. Downloads `shipwreck-updater.php` to the host's `public_html/`
+2. Generates a 32-char random token and writes the config to `~/.shipwreck-updater.config.php` (above public_html, never web-served)
+3. Picks a random update minute (0–59) + random hour (23/00/01/02) so this site doesn't poll GitHub at the same minute as every other site
+4. Adds the cron line
+5. Prints the resulting status URL + manual-trigger URL
+
+**Trigger the first update manually** to seed `/blog/`:
+```bash
+curl "https://<domain>/shipwreck-updater.php?token=<TOKEN_FROM_INSTALLER_OUTPUT>"
+```
+
+Verify in the browser: `https://<domain>/blog/` should now render.
+
+---
+
+## Phase 7 — Apache + Cloudflare hygiene
+
+Two checks per site, especially on cPanel hosts where WordPress or another app already runs at the apex:
+
+1. **`.htaccess` doesn't intercept `/blog/*`**
+   Test by `curl https://<domain>/blog/` and confirm it serves the static index.html (not WP). If the WP rewrite catches it, add to `.htaccess` BEFORE WP rules:
+   ```apacheconf
+   RewriteRule ^blog/ - [L]
+   ```
+
+2. **Cloudflare cache rule for `/blog/*`** — recommended. Phase: `http_request_cache_settings`. When: `(http.request.uri.path matches "^/blog/")`. Action: `cache_level=cache_everything`, `edge_ttl=86400`. The updater purges cache on each push.
+
+---
+
+## Phase 8 — Register & monitor
+
+1. **Add to site registry.** Edit `<engine-repo>/.shipwreck/sites.json`, append the new site entry. Set `engineVersion` to the version that's installed (read from `https://<domain>/shipwreck-updater.php?token=…&action=status`). Commit + push the engine repo.
+
+2. **Add an Uptime Kuma monitor** for the status endpoint:
+   - URL: `https://<domain>/shipwreck-updater.php?token=<TOKEN>&action=status`
+   - Type: HTTP keyword
+   - Keyword: `"is_current":true`
+   - If the keyword goes missing for >7 days, the site has fallen behind on updates — alert.
+
+3. **Update `D:/NyXi's Vault/Topics/<SiteName>.md`** with:
+   - Engine version installed
+   - Theme integration date
+   - Custom CTAs added
+   - Per-site quirks (host-specific fonts, dark-mode, .htaccess gotchas)
+   - Reference to the per-site blog repo
 
 ---
 
@@ -197,20 +276,25 @@ node scripts/visual-diff.mjs <host-homepage-url> <host-domain>/blog/
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| ToC duplicated at desktop width | Tailwind not scanning engine components | Verify `@shipwreck/blog-theme-default >= 0.2.0` and that the preset's `content` array is actually loaded (dump resolved config: `node -e "import('./tailwind.config.ts').then(c => console.log(c.default))"`) |
-| Giant brand banner above article | Old `defaultFeaturedImage` hero fallback | Upgrade `@shipwreck/blog-core` to `>= 0.2.0`; remove `?? siteConfig.seo.defaultFeaturedImage` from `[...slug].astro` |
-| Two H1s on every post | MDX starts with same H1 as frontmatter title | Wire `remarkStripDuplicateH1` from `@shipwreck/blog-core/remark/strip-duplicate-h1.mjs` into `astro.config.ts` |
-| Buttons don't match host | `--button-*` tokens not set | Sample host's primary CTA in browser devtools, copy values into tokens.css |
-| Blog body looks "almost" right but slightly off | One or more tokens left at engine default | Re-run validation checklist from TOKEN-CONTRACT.md — find the missing override |
+| ToC duplicated at desktop width | `@shipwreck/blog-theme-default < 0.2.0` (Tailwind not scanning engine components) | Ensure `npm update` pulled `^0.2.0` of both engine packages |
+| Giant brand banner above article | Old `defaultFeaturedImage` hero fallback | Upgrade `@shipwreck/blog-core >= 0.2.0`; thin wrappers in `>= 0.3.0` no longer have this risk |
+| Two H1s on every post | MDX starts with same H1 as frontmatter title | The `shipwreckBlog()` integration auto-strips it from `>= 0.3.0`. If still seeing it, confirm `astro.config.ts` uses the integration. |
+| Buttons don't match host | `--button-*` tokens not set in tokens.css | Sample host's primary CTA in browser devtools, copy values |
+| Blog body looks "almost" right but slightly off | One or more tokens at engine default | Re-run [Validation checklist](../../packages/blog-theme-default/TOKEN-CONTRACT.md#validation-checklist) |
+| Updater says `github_unreachable` | Outbound HTTPS blocked on the host | Most cPanel hosts allow it. If blocked, contact host or use Path B (SSH push) |
+| Updater says `sha256_mismatch` | Tarball corrupted or release notes don't include the SHA line | Check the per-site repo's GH Action output. The build workflow writes the SHA into the release body automatically — if it's missing, the workflow file may be out of date |
+| `403 Forbidden` from updater URL | Wrong token | Read it from `~/.shipwreck-updater.config.php` |
 
 ---
 
 ## After integration succeeds
 
-Update `D:/NyXi's Vault/Topics/<SiteName>.md` with:
-- Engine version installed
-- Theme integration date
-- Any custom CTAs added
-- Any quirks (host-specific fonts, dark-mode handling, etc.)
+The site is now fully self-updating. Future engine releases auto-propagate through:
 
-This becomes the reference for the next agent who maintains the site.
+1. Engine repo tags `vX.Y.Z`
+2. Engine GH Action `release-dispatch.yml` fires `repository_dispatch` to every registered site repo
+3. Per-site repo's `blog-build.yml` runs, builds with new engine, publishes new release
+4. Host's daily cron picks up the release within 24h, atomically swaps to new version
+5. Cloudflare cache purged automatically
+
+**Nothing else for us to do per release** unless something breaks. If something breaks: visual-diff in the GH Action will catch it (TODO: wire that in), or Uptime Kuma will catch the keyword regression, or someone notices.

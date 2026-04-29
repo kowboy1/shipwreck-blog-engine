@@ -1,8 +1,7 @@
 ---
 import { getCollection } from "astro:content"
-import { buildPostMeta, breadcrumbSchema } from "@shipwreck/blog-core"
-import PostCard from "@shipwreck/blog-core/components/PostCard.astro"
-import Breadcrumbs from "@shipwreck/blog-core/components/Breadcrumbs.astro"
+import { prepareCategoryPage } from "@shipwreck/blog-core"
+import ListingPage from "@shipwreck/blog-core/pages/ListingPage.astro"
 import BaseLayout from "../../layouts/BaseLayout.astro"
 import siteConfig from "../../../site.config"
 
@@ -22,47 +21,9 @@ export async function getStaticPaths() {
 }
 
 const { category, posts } = Astro.props
-const url = new URL(`${siteConfig.blogBasePath}/categories/${category}/`, siteConfig.baseUrl).toString()
-const blogUrl = new URL(siteConfig.blogBasePath, siteConfig.baseUrl).toString()
-
-const meta = buildPostMeta({
-  post: {
-    title: `${category} — ${siteConfig.siteName}`,
-    metaDescription: `All posts in the "${category}" category on ${siteConfig.siteName}`,
-    publishDate: new Date(),
-    status: "published",
-    tags: [],
-    noindex: false,
-    featured: false,
-    sticky: false,
-    articleType: "BlogPosting",
-  },
-  siteConfig,
-  url,
-})
-
-const crumbs = [
-  { name: "Home", url: siteConfig.baseUrl },
-  { name: "Blog", url: blogUrl },
-  { name: category },
-]
+const data = prepareCategoryPage({ category, posts, siteConfig })
 ---
 
-<BaseLayout
-  meta={{ ...meta, og: { ...meta.og, type: "website" } }}
-  jsonLd={breadcrumbSchema(crumbs.map((c) => ({ name: c.name, url: c.url ?? url })))}
->
-  <div class="mx-auto max-w-3xl">
-    <Breadcrumbs items={crumbs} />
-    <h1 class="mt-4 font-heading text-4xl font-bold text-primary capitalize">{category}</h1>
-    <p class="mt-2 text-muted">{posts.length} {posts.length === 1 ? "post" : "posts"}</p>
-    <div class="mt-8 space-y-6">
-      {posts.map((post) => (
-        <PostCard
-          post={post}
-          basePath={siteConfig.blogBasePath}
-        />
-      ))}
-    </div>
-  </div>
+<BaseLayout meta={data.meta} jsonLd={data.jsonLd}>
+  <ListingPage data={data} siteConfig={siteConfig} />
 </BaseLayout>
