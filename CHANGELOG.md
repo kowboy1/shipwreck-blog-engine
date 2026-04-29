@@ -8,6 +8,38 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-04-29
+
+Patch release adding the integration acceptance CI test (Nyxi feedback #7) — closes the loop on "regressions hit Nyxi before they hit CI."
+
+### Added
+
+- **`scripts/test-integration.sh`** — full end-to-end integration acceptance test. Simulates a clean sibling-layout install in a tmp dir (engine + per-site repo as siblings), runs the canonical install sequence (copy demo-site, fix file: deps, npm install, build, doctor preflight, dist inspection), and asserts 32 outcomes including:
+  - File: dep symlinks resolve correctly
+  - npm install succeeds
+  - Doctor `--preflight` reports clean (no install-level issues)
+  - Build succeeds
+  - All expected dist files exist (index, post pages, sitemap, RSS, robots, admin)
+  - CSS contains every engine page-level utility class (catches the v0.3.0/v0.3.1-style preset-content bug)
+  - CSS file size sanity (>15 KB — broken installs produce <10 KB)
+  - Post pages have exactly one H1 (duplicate-H1 stripper works)
+  - Post pages emit BlogPosting + BreadcrumbList JSON-LD schemas
+  - Sitemap lists post URLs
+  - Admin config has logo_url
+  - Doctor's Phase 2/3 detection heuristics work correctly
+
+- **`.github/workflows/integration-test.yml`** — runs `scripts/test-integration.sh` on every PR and push to main. Triggers on changes to `packages/**`, `examples/demo-site/**`, or the test script itself. **If this fails, don't merge.** The install experience is broken if it does.
+
+- **`shipwreck-blog-doctor --preflight` mode** — install-level checks only (engine resolves, file: deps work). Skips Phase 2/3 checks (those are integration-time concerns, not install-time). Use this RIGHT AFTER `npm install` to catch install bugs before building. Default mode (no flag) still runs everything for end-of-job verification.
+
+### Why
+
+Nyxi's first two integration attempts both produced broken sites due to install-time issues that should have been caught in CI: broken file: dep symlinks (v0.3.0), Tailwind preset content path bug (v0.3.1), cross-package symlink resolution issues (v0.3.2). The acceptance test runs the same flow Nyxi would and catches all three classes of bug before they ship. Future regressions in this area get caught by CI, not by Nyxi.
+
+### Migration
+
+No consumer-side changes. The new `--preflight` flag is additive (existing `npm run doctor` calls still work as before).
+
 ## [0.3.2] - 2026-04-29
 
 Patch release fixing the symlink/scan bug that v0.3.1 only partially fixed, plus the structural agent-doc problems Nyxi's second integration attempt revealed (skipped phases, no entrypoint discipline, no preflight verification).

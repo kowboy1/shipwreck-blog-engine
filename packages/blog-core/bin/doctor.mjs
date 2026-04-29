@@ -12,9 +12,17 @@
  * Exit code 0 = all checks passed. Non-zero = at least one fatal issue.
  *
  * Usage:
- *   npx shipwreck-blog-doctor                  # all checks, fatal on fail
+ *   npx shipwreck-blog-doctor                  # all checks (install + integration), fatal on fail
+ *   npx shipwreck-blog-doctor --preflight      # install-level only (engine resolves, file: deps OK)
  *   npx shipwreck-blog-doctor --skip-build     # skip the build check (faster)
  *   npx shipwreck-blog-doctor --json           # machine-readable output
+ *
+ * Mode summary:
+ *   --preflight   = run RIGHT AFTER npm install. Skips Phase 2/3/build checks.
+ *                   Catches install-time bugs (broken symlinks, scaffold corruption).
+ *   (default)     = run BEFORE declaring done. Includes everything: install +
+ *                   Phase 2/3 checks (tokens.css present, SiteShell ported) +
+ *                   build verification + CSS class sanity check.
  */
 import { existsSync, readFileSync, statSync, readdirSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -22,7 +30,8 @@ import { execSync } from "node:child_process"
 import process from "node:process"
 
 const args = new Set(process.argv.slice(2))
-const SKIP_BUILD = args.has("--skip-build")
+const PREFLIGHT = args.has("--preflight")
+const SKIP_BUILD = args.has("--skip-build") || PREFLIGHT
 const JSON_OUT = args.has("--json")
 const CWD = process.cwd()
 
@@ -98,6 +107,10 @@ if (!siteConfigPath) {
   }
 }
 
+// Skip Phase 2/3 checks in preflight mode (those are integration-time concerns,
+// not install-time concerns)
+if (!PREFLIGHT) {
+
 // 3. tokens.css exists and has been customised (Phase 2)
 const tokensPath = ["src/styles/tokens.css", "_blog/src/styles/tokens.css"]
   .map((p) => resolve(CWD, p))
@@ -149,6 +162,8 @@ if (footerPath) {
     pass("SiteShell/Footer.astro has been customised")
   }
 }
+
+} // end !PREFLIGHT block (Phase 2/3 checks)
 
 // 6. Source-vs-deploy layout guardrail (Nyxi feedback #6)
 // The blog SOURCE repo should not be the same dir as the host's static MOUNT path.

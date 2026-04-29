@@ -1,0 +1,46 @@
+name: Integration acceptance test
+
+# Runs the full end-to-end integration simulation on every PR and every push to
+# main. Catches the "freshly-integrated site is broken" regression class that
+# bit Nyxi twice (broken file: dep symlinks, missing CSS classes, scaffold
+# structure issues, build failures on cross-package symlinks).
+#
+# If this fails, the install experience is broken — agents will hit the same
+# bug. Don't merge red.
+#
+# What it does: scripts/test-integration.sh in a fresh checkout. See that file
+# for the full sequence (sibling layout simulation, npm install, build, doctor
+# preflight, dist inspection, JSON-LD schema checks, CSS class sanity).
+
+on:
+  pull_request:
+    paths:
+      - "packages/**"
+      - "examples/demo-site/**"
+      - "scripts/test-integration.sh"
+      - "scripts/shipwreck-updater.php"
+      - ".github/workflows/integration-test.yml"
+  push:
+    branches: [main, master]
+    paths:
+      - "packages/**"
+      - "examples/demo-site/**"
+      - "scripts/test-integration.sh"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install root deps (workspaces)
+        run: npm install --no-audit --no-fund
+
+      - name: Run integration acceptance test
+        run: bash scripts/test-integration.sh --verbose
