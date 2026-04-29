@@ -1,0 +1,112 @@
+---
+title: "Getting started with {{siteName}}"
+excerpt: "Practical orientation for new visitors and contributors to {{siteName}}. Longer post — covers reading, sharing, subscribing, and where to go next."
+publishDate: {{today}}
+status: "published"
+metaTitle: "Getting started with {{siteName}}: a practical orientation"
+metaDescription: "How to read, follow, and contribute to {{siteName}}. Subscribing via RSS, navigating archives, finding specific topics, and what's coming next."
+author: "{{authorId}}"
+category: "announcements"
+tags: ["intro", "guide", "rss", "navigation", "long-form"]
+articleType: "BlogPosting"
+faqItems:
+  - question: "How do I subscribe via RSS?"
+    answer: "Paste https://<your-domain>/blog/rss.xml into any RSS reader (Feedly, Inoreader, NetNewsWire, Reeder, etc). The feed includes the most recent 20 posts by publish date with full content."
+  - question: "How is search-engine indexing handled?"
+    answer: "Each post has canonical URLs, structured data (schema.org), Open Graph metadata, and is listed in the sitemap at /blog/sitemap-index.xml. Submit that sitemap to Google Search Console + Bing Webmaster Tools after launch for faster indexing."
+  - question: "Can I download all posts at once?"
+    answer: "The site git repo has every post as plain MDX text in src/content/posts/. If you have access to the repo, that's the canonical content store — readable forever, even if this domain disappears."
+  - question: "Are there pagination, archive, or filter views?"
+    answer: "Yes. /blog/ lists recent posts. /blog/page/2/, /blog/page/3/ etc. continue back through history. /blog/tags/<tag>/ shows everything for a tag. /blog/categories/<category>/ shows everything for a category. /blog/authors/<id>/ shows everything by an author."
+  - question: "How do I cite a post?"
+    answer: "Use the canonical URL of the post (linked from the H1 — copy from the address bar). Title + author + publish date are all in the article schema, so most reference managers (Zotero, etc.) auto-fill correctly."
+---
+
+This is a longer seed post. It exists to demonstrate that the blog handles substantive content correctly — Table of Contents on the right, multi-section structure, FAQ schema, internal links between posts, the works.
+
+If you're verifying an integration: scroll through this post and confirm everything renders. If you're a real visitor reading this on a live site: this is starter content; real posts will appear in time.
+
+## How to read
+
+Posts follow the same pattern across {{siteName}}:
+
+- **Title** at the top, with author byline and publish date below it
+- **Excerpt** below the byline — a 1-2 sentence summary of what the post covers
+- **Body** in the main column, with H2 sections for major topics and H3 for sub-sections
+- **Table of Contents** in the right column on desktop (only on posts long enough to warrant one — short posts skip it)
+- **Tag chips** at the bottom of the body for cross-referencing
+- **Author bio** below the tags
+- **More articles** grid at the very bottom for discovery
+
+If the body has FAQ items in its frontmatter (this one does), the questions get emitted as machine-readable structured data — search engines know the post answers specific questions and may surface them directly in results.
+
+## How to follow new posts
+
+Three options, in order of how often you check:
+
+### Option A: RSS
+
+The most reliable way. The RSS feed lives at [/blog/rss.xml](/blog/rss.xml). Paste it into any feed reader and new posts will appear there as they're published.
+
+RSS readers are private (no account needed for {{siteName}}) and don't have an algorithm — you see every post, in order, exactly once. If you used to read blogs via Google Reader, RSS is what you want.
+
+### Option B: Bookmark and check
+
+Bookmark [/blog/](/blog/). Visit when you remember. Posts are listed newest-first.
+
+This works fine for low-frequency reading.
+
+### Option C: Sitemap monitoring
+
+For automated systems (e.g. content aggregators): the [sitemap](/blog/sitemap-index.xml) gets updated on every post. Tools that watch sitemaps will detect new posts within minutes of publish.
+
+Most humans should pick A or B.
+
+## How to find specific topics
+
+Each post is filed under one **category** and tagged with multiple **tags**.
+
+- Click any tag chip at the bottom of a post → see everything tagged with that
+- Click the category in the post metadata → see everything in that bucket
+- Use the home page's main nav for top-level categories
+
+Don't try to navigate by date alone — `/blog/page/2/` and onwards exists, but it's a slow way to find a specific post you remember reading. Tags + categories are faster.
+
+## How to share
+
+Every post has:
+
+- A canonical URL (visible in the address bar; the same URL works for everyone)
+- Open Graph metadata (rich previews on Twitter/LinkedIn/Slack/Discord/iMessage when you paste the URL)
+- A Twitter Card (similar but Twitter-specific)
+- An RSS-friendly title + excerpt for feed readers
+
+Just paste the URL anywhere — the receiving platform will render it nicely.
+
+## How content moves around
+
+A behind-the-scenes note: posts are plain Markdown files (with some inline component support) in this site's git repository. The blog you see is built from those files. That has practical implications:
+
+- Content survives this domain. If {{siteName}} ever moves to a different domain or platform, the posts are git-tracked text and can move with it.
+- Edits and updates are visible in commit history.
+- There's no database to back up; the source of truth IS the text files.
+
+This is a deliberate architectural choice. Static blogs are massively faster, cheaper, and more durable than database-backed ones, at the cost of "hit publish and it's live in 2 seconds" being replaced by "hit commit and it's live in 30 seconds." For a content blog, that trade is fine.
+
+## What's next
+
+Real posts will arrive. The seed content (this post, [Welcome](/blog/01-welcome/), and [Three things](/blog/02-three-things/)) gets replaced or deleted as actual content lands.
+
+If there's a topic you'd particularly like to see covered, the contact links in the footer reach the editor.
+
+## A meta note
+
+This is the third of three seed posts generated by `npx shipwreck-blog-doctor seed-posts` during integration. Together they:
+
+- Demonstrate short, medium, and long post rendering
+- Cover FAQ schema (post 1 has 3 FAQs, post 2 has 3, this one has 5)
+- Cross-link between each other for related-posts validation
+- Use a single category but varied tags for archive testing
+- Include featured/non-featured states (post 1 is featured)
+
+If you're a real visitor reading this, ignore everything in this section — it's leftover scaffolding. Apologies, and please email someone to delete it.

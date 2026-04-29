@@ -1,6 +1,6 @@
 {
   "name": "@shipwreck/blog-core",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "Core engine for Shipwreck Blog — schema, components, SEO helpers",
   "type": "module",
   "main": "./src/index.ts",
@@ -17,7 +17,8 @@
   },
   "files": [
     "src",
-    "bin"
+    "bin",
+    "src/templates"
   ],
   "bin": {
     "shipwreck-blog-doctor": "./bin/doctor.mjs"

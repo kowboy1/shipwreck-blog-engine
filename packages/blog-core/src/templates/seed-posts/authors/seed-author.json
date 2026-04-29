@@ -1,0 +1,5 @@
+{
+  "name": "{{authorName}}",
+  "bio": "Editor of the {{siteName}} blog. Posts here are seed content — replace with a real author bio when first real post lands.",
+  "url": "{{baseUrl}}"
+}

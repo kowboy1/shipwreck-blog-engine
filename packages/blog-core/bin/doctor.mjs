@@ -143,6 +143,93 @@ function formatDuration(ms) {
 
 // ---------- subcommands ----------
 
+function seedPosts() {
+  // Find the site.config to extract substitution values
+  const configPaths = ["site.config.ts", "_blog/site.config.ts"].map((p) => resolve(CWD, p))
+  const configPath = configPaths.find((p) => existsSync(p))
+  if (!configPath) {
+    console.error(`seed-posts: site.config.ts not found. Run from inside _blog/.`)
+    process.exit(1)
+  }
+  const configContent = readFileSync(configPath, "utf8")
+  const siteName = (configContent.match(/siteName:\s*"([^"]+)"/) || [])[1] || "<site>"
+  const baseUrl = (configContent.match(/baseUrl:\s*"([^"]+)"/) || [])[1] || ""
+
+  // Find templates dir (relative to this script)
+  const scriptDir = dirname(process.argv[1] || "")
+  const templatesDir = resolve(scriptDir, "..", "src", "templates", "seed-posts")
+  if (!existsSync(templatesDir)) {
+    console.error(`seed-posts: templates not found at ${templatesDir}. Engine package may be incomplete.`)
+    process.exit(1)
+  }
+
+  // Resolve content dirs in CWD
+  const blogRoot = existsSync(resolve(CWD, "_blog")) ? resolve(CWD, "_blog") : CWD
+  const postsDir = resolve(blogRoot, "src", "content", "posts")
+  const authorsDir = resolve(blogRoot, "src", "content", "authors")
+
+  if (!existsSync(postsDir)) {
+    console.error(`seed-posts: ${postsDir} doesn't exist. Run from inside _blog/ or ensure src/content/posts/ exists.`)
+    process.exit(1)
+  }
+  if (!existsSync(authorsDir)) {
+    mkdirSync(authorsDir, { recursive: true })
+  }
+
+  // Substitution map
+  const today = new Date().toISOString().slice(0, 10)
+  const authorId = "seed-author"
+  const authorName = `${siteName} editor`
+
+  function substitute(s) {
+    return s
+      .replace(/\{\{siteName\}\}/g, siteName)
+      .replace(/\{\{baseUrl\}\}/g, baseUrl)
+      .replace(/\{\{today\}\}/g, today)
+      .replace(/\{\{authorId\}\}/g, authorId)
+      .replace(/\{\{authorName\}\}/g, authorName)
+  }
+
+  let written = 0
+  // Write posts
+  for (const file of readdirSync(templatesDir)) {
+    if (!file.endsWith(".mdx")) continue
+    const src = readFileSync(join(templatesDir, file), "utf8")
+    const dest = join(postsDir, file)
+    if (existsSync(dest)) {
+      console.log(`  skip: ${dest.replace(CWD, ".")} already exists`)
+      continue
+    }
+    writeFileSync(dest, substitute(src))
+    written++
+    console.log(`  ✓ wrote ${dest.replace(CWD, ".")}`)
+  }
+
+  // Write seed author
+  const seedAuthorTemplate = join(templatesDir, "authors", "seed-author.json")
+  if (existsSync(seedAuthorTemplate)) {
+    const dest = join(authorsDir, "seed-author.json")
+    if (!existsSync(dest)) {
+      writeFileSync(dest, substitute(readFileSync(seedAuthorTemplate, "utf8")))
+      console.log(`  ✓ wrote ${dest.replace(CWD, ".")}`)
+    } else {
+      console.log(`  skip: ${dest.replace(CWD, ".")} already exists`)
+    }
+  }
+
+  console.log(`\n✓ Seed content created (${written} posts).
+These are SITE-THEMED placeholder posts (with FAQs, varied lengths, internal
+links) so you can visually verify the integration. They are NOT engine
+boilerplate — doctor's demo-content check will still pass.
+
+Replace them with real content before treating the blog as launched, OR
+delete them if you'd rather start with an empty blog. Either is fine.
+
+Each seed post explicitly identifies itself as seed content in its body, so
+if a real visitor lands on one before you've replaced them, they're not
+confused.`)
+}
+
 function attestStart() {
   const state = readState() ?? blankState()
   if (state.integrationStartedAt) {
@@ -358,6 +445,7 @@ ${phase9Summary}
 
 // ---------- subcommand dispatch (after all helpers are defined) ----------
 
+if (SUBCOMMAND === "seed-posts") { seedPosts(); process.exit(0) }
 if (SUBCOMMAND === "attest-start") { attestStart(); process.exit(0) }
 if (SUBCOMMAND === "attest-phase9") { attestPhase9(argv.slice(1)); process.exit(0) }
 if (SUBCOMMAND === "attest-feedback") { attestFeedback(argv.slice(1)); process.exit(0) }
@@ -639,57 +727,185 @@ if (FULL) {
     pass(`Phase 7b nav link decision: ${state.navLink.decision}`, `attested at ${state.navLink.ts}`)
   }
 
-  // 8d. Phase 7a footer-link host-side check.
-  // Walk up from CWD until we find what looks like the site repo root (a dir
-  // ABOVE _blog/ that contains site files), then grep for /blog references
-  // in HTML/Astro files OUTSIDE of _blog/ and node_modules/.
+  // 8d. Phase 7 host-side ground truth: walk every page-like file in the site
+  // repo (outside _blog/ and node_modules/), classify each /blog link as
+  // appearing in NAV-context vs FOOTER-context, then cross-check against
+  // the state file's nav-link decision. Three failure modes:
+  //
+  //   1. State says "approved" but no /blog link found in any nav markup.
+  //   2. State says "declined" but /blog link IS found in nav markup
+  //      (= agent added the link without permission and lied about it).
+  //   3. Footer link missing from many pages (multi-template sites where
+  //      the agent only added the link to one template).
+  //
+  // This is the one part of doctor that doesn't trust the state file —
+  // it verifies actual host markup against attested decisions.
+
   let siteRepoRoot = null
-  let dir = CWD
-  // _blog/ is typically a child of the site repo; the site repo has the host's pages
   if (basename(CWD) === "_blog" || basename(resolve(CWD, "..")) === "_blog") {
     siteRepoRoot = basename(CWD) === "_blog" ? resolve(CWD, "..") : resolve(CWD, "..", "..")
   }
   if (siteRepoRoot && existsSync(siteRepoRoot)) {
-    let footerLinkFound = false
-    let searchedFiles = 0
-    try {
-      // Lightweight grep: read up to 50 .html/.astro files at the site repo root, skip _blog and node_modules
-      function walkLight(d, depth = 0) {
-        if (depth > 4 || searchedFiles >= 50 || footerLinkFound) return
-        const entries = readdirSync(d, { withFileTypes: true })
-        for (const ent of entries) {
-          if (footerLinkFound || searchedFiles >= 50) return
-          if (ent.name === "_blog" || ent.name === "node_modules" || ent.name === ".git" || ent.name.startsWith(".astro")) continue
-          const p = join(d, ent.name)
-          if (ent.isDirectory()) {
-            walkLight(p, depth + 1)
-          } else if (/\.(html|astro|tsx|jsx|vue|svelte|php|liquid)$/i.test(ent.name)) {
-            searchedFiles++
-            const content = readFileSync(p, "utf8")
-            // Look for an anchor or link to /blog (root-relative or fully qualified)
-            if (/href=["']\/blog\/?["']|href=["']https?:\/\/[^"']+\/blog\/?["']/.test(content)) {
-              footerLinkFound = true
-              return
-            }
-          }
+    // Collect all page-like files
+    const pageFiles = []
+    function walkPages(d, depth = 0) {
+      if (depth > 6 || pageFiles.length >= 200) return
+      let entries
+      try { entries = readdirSync(d, { withFileTypes: true }) } catch { return }
+      for (const ent of entries) {
+        if (pageFiles.length >= 200) return
+        if (ent.name === "_blog" || ent.name === "blog" || ent.name === "node_modules" ||
+            ent.name === ".git" || ent.name.startsWith(".astro") || ent.name === "dist") continue
+        const p = join(d, ent.name)
+        if (ent.isDirectory()) {
+          walkPages(p, depth + 1)
+        } else if (/\.(html|astro|tsx|jsx|vue|svelte|php|liquid)$/i.test(ent.name)) {
+          pageFiles.push(p)
         }
       }
-      walkLight(siteRepoRoot)
-    } catch { /* ignore */ }
+    }
+    walkPages(siteRepoRoot)
 
-    if (footerLinkFound) {
-      pass("Host site has a /blog link (Phase 7a footer link wired)", `searched ${searchedFiles} files in ${siteRepoRoot}`)
+    // For each file, classify /blog link occurrences as nav vs footer context.
+    // Heuristic: find each /blog href occurrence; look at the surrounding ~600
+    // chars; if a `<footer` appears closer (in either direction) than a
+    // `<nav` or `<header`, it's a footer occurrence. Otherwise nav.
+    const footerLinkFiles = []
+    const navLinkFiles = []
+    const filesWithFooterMarkup = []
+    for (const file of pageFiles) {
+      let content
+      try { content = readFileSync(file, "utf8") } catch { continue }
+
+      const hasFooter = /<footer[\s>]/i.test(content)
+      if (hasFooter) filesWithFooterMarkup.push(file)
+
+      const linkRe = /href=["']\/blog\/?["']|href=["']https?:\/\/[^"']+\/blog\/?["']/g
+      let m
+      let foundFooter = false
+      let foundNav = false
+      while ((m = linkRe.exec(content)) !== null) {
+        const idx = m.index
+        // Find the closest preceding tag among <footer, <nav, <header
+        const before = content.slice(Math.max(0, idx - 1000), idx)
+        const after = content.slice(idx, Math.min(content.length, idx + 1000))
+        // Check what container this link is most likely inside by scanning back
+        // and counting unclosed opens: if the most recent unclosed opener before
+        // the link is a footer/nav/header, classify accordingly.
+        const recentFooter = before.lastIndexOf("<footer")
+        const recentFooterClose = before.lastIndexOf("</footer")
+        const recentNav = Math.max(before.lastIndexOf("<nav"), before.lastIndexOf("<header"))
+        const recentNavClose = Math.max(before.lastIndexOf("</nav"), before.lastIndexOf("</header"))
+        const inFooter = recentFooter > recentFooterClose && recentFooter > -1
+        const inNav = recentNav > recentNavClose && recentNav > -1
+        if (inFooter && (!inNav || recentFooter > recentNav)) foundFooter = true
+        else if (inNav) foundNav = true
+        else {
+          // No clear container — fall back to "near footer" heuristic
+          if (/<footer[\s>][\s\S]{0,2000}$/i.test(before)) foundFooter = true
+          else foundNav = true
+        }
+      }
+      if (foundFooter) footerLinkFiles.push(file)
+      if (foundNav) navLinkFiles.push(file)
+    }
+
+    // Phase 7a footer check: link must be in MOST footer-bearing files
+    if (filesWithFooterMarkup.length === 0) {
+      // Maybe this site doesn't use <footer> tags — fall back to "any link found anywhere"
+      if (footerLinkFiles.length > 0 || navLinkFiles.length > 0) {
+        pass("Host site has a /blog link (no <footer> markup detected; link found elsewhere)")
+      } else {
+        fail(
+          "No /blog link found anywhere in host site",
+          `Searched ${pageFiles.length} page files. The blog is unreachable from the host site.`,
+        )
+      }
     } else {
-      fail(
-        "No /blog link found in host site files",
-        `Searched ${searchedFiles} HTML/Astro/template files in ${siteRepoRoot} — no <a href="/blog"> or fully-qualified blog link found.\n` +
-          `Phase 7a requires adding a 'Blog' link to the host's footer so visitors can discover the blog. Without it the blog is technically live but invisible.`,
-      )
+      const coverage = footerLinkFiles.length / filesWithFooterMarkup.length
+      if (coverage >= 0.9) {
+        pass(
+          `/blog link present in ${footerLinkFiles.length}/${filesWithFooterMarkup.length} footer-bearing files`,
+          `${Math.round(coverage * 100)}% coverage`,
+        )
+      } else if (coverage >= 0.5) {
+        warning(
+          `/blog footer link in only ${footerLinkFiles.length}/${filesWithFooterMarkup.length} files (${Math.round(coverage * 100)}%)`,
+          `Some templates missing the link. Files without it:\n  ${filesWithFooterMarkup.filter((f) => !footerLinkFiles.includes(f)).slice(0, 10).map((f) => f.replace(siteRepoRoot, ".")).join("\n  ")}`,
+        )
+      } else {
+        fail(
+          `/blog footer link missing from most templates (${footerLinkFiles.length}/${filesWithFooterMarkup.length} = ${Math.round(coverage * 100)}%)`,
+          `Multi-template sites need the footer link in ALL footer-bearing pages. Add to:\n  ${filesWithFooterMarkup.filter((f) => !footerLinkFiles.includes(f)).slice(0, 10).map((f) => f.replace(siteRepoRoot, ".")).join("\n  ")}`,
+        )
+      }
+    }
+
+    // Phase 7b nav-link cross-check: state vs ground truth
+    if (state?.navLink?.decision === "declined") {
+      if (navLinkFiles.length > 0) {
+        fail(
+          "Nav link contradicts attestation",
+          `You attested 'attest-nav-link declined' but a /blog link IS present in nav-context markup of ${navLinkFiles.length} file(s):\n  ${navLinkFiles.slice(0, 10).map((f) => f.replace(siteRepoRoot, ".")).join("\n  ")}\n` +
+            `Either: (a) the link was added without user approval — REMOVE it from those files; or (b) the user actually approved and the attestation is wrong — re-run 'attest-nav-link approved' after confirming with the user. Lying to the doctor is a protocol violation.`,
+        )
+      } else {
+        pass("Nav link attestation 'declined' matches host markup (no nav-context /blog link found)")
+      }
+    } else if (state?.navLink?.decision === "approved") {
+      if (navLinkFiles.length === 0) {
+        fail(
+          "Nav link attestation 'approved' but no nav /blog link found",
+          `You attested the user approved a nav link, but no /blog link appears in nav/header markup of any host file. Either add it (Phase 7b) or re-attest as 'declined'.`,
+        )
+      } else {
+        pass(`Nav link attestation 'approved' verified in ${navLinkFiles.length} file(s)`)
+      }
+    }
+
+    // 8e. SiteShell fidelity check: blog Footer.astro should not be dramatically
+    // shorter than the host's largest footer block. Catches "agent ported the
+    // structure but stripped the content" — bug 3 from the v0.3.8 integration.
+    const blogFooterPath = ["src/components/SiteShell/Footer.astro", "_blog/src/components/SiteShell/Footer.astro"]
+      .map((p) => resolve(CWD, p))
+      .find((p) => existsSync(p))
+    if (blogFooterPath && filesWithFooterMarkup.length > 0) {
+      const blogFooter = readFileSync(blogFooterPath, "utf8")
+      // Extract just the JSX/HTML body (skip frontmatter)
+      const blogFooterBody = blogFooter.replace(/^---[\s\S]*?---\n/, "")
+      const blogLinkCount = (blogFooterBody.match(/<a[\s>]/gi) || []).length
+      const blogContentLen = blogFooterBody.length
+
+      // Find the host file with the largest <footer> block
+      let largestHostFooter = ""
+      for (const file of filesWithFooterMarkup) {
+        try {
+          const content = readFileSync(file, "utf8")
+          const m = content.match(/<footer[\s\S]*?<\/footer>/i)
+          if (m && m[0].length > largestHostFooter.length) largestHostFooter = m[0]
+        } catch { continue }
+      }
+      const hostLinkCount = (largestHostFooter.match(/<a[\s>]/gi) || []).length
+      const hostContentLen = largestHostFooter.length
+
+      if (hostLinkCount > 0) {
+        const linkRatio = blogLinkCount / hostLinkCount
+        const lenRatio = blogContentLen / hostContentLen
+        if (linkRatio < 0.6 || lenRatio < 0.4) {
+          warning(
+            "SiteShell Footer.astro looks simplified vs host footer",
+            `Blog footer has ${blogLinkCount} <a> tags + ${blogContentLen} chars; host's largest footer has ${hostLinkCount} <a> tags + ${hostContentLen} chars. ` +
+              `Phase 3 rule: PORT VERBATIM, do not simplify. Re-check that all the host's footer sections, links, and content are present in your Footer.astro.`,
+          )
+        } else {
+          pass("SiteShell Footer.astro has comparable content density to host footer", `${blogLinkCount}/${hostLinkCount} links, ${Math.round(lenRatio * 100)}% content length`)
+        }
+      }
     }
   } else {
     warning(
-      "Could not auto-detect site repo root for Phase 7a check",
-      `Doctor walks up from CWD looking for a parent dir of _blog/. Couldn't find it. If you're running from somewhere unusual, the Phase 7a footer check is skipped — verify manually that the host site has a /blog link.`,
+      "Could not auto-detect site repo root for Phase 7 host checks",
+      `Doctor walks up from CWD looking for a parent dir of _blog/. Couldn't find it.`,
     )
   }
 }

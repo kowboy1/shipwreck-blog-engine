@@ -1,0 +1,47 @@
+---
+title: "Three things about {{siteName}}"
+excerpt: "Three things worth knowing if you're new to {{siteName}}. Short, practical, no fluff."
+publishDate: {{today}}
+status: "published"
+metaTitle: "Three things to know about {{siteName}}"
+metaDescription: "A short orientation for new visitors to {{siteName}} — what's here, what's not, and where to look first."
+author: "{{authorId}}"
+category: "announcements"
+tags: ["intro", "guide", "orientation"]
+articleType: "BlogPosting"
+faqItems:
+  - question: "Where should a first-time visitor start?"
+    answer: "The home page covers the most-asked questions. Beyond that, the categories link in the footer surfaces topical content. The blog (this section) covers explainers, updates, and longer-form pieces."
+  - question: "Is the content authoritative?"
+    answer: "Posts on this blog are editorial. Where the topic touches anything regulated, safety-related, or time-sensitive, the post will link out to the official source — don't rely on a blog post for that."
+  - question: "Can I share posts?"
+    answer: "Yes. Each post has a canonical URL, a proper Open Graph card for social previews, and structured data for search engines. Linking to /blog/<slug>/ works everywhere."
+---
+
+If you're new to {{siteName}}, here's the short version. Three things worth knowing — none of them surprising, all of them useful.
+
+## 1. The blog is part of the site, not a separate thing
+
+This blog (`/blog/`) sits inside the main {{siteName}} site. It uses the same domain, the same navigation, the same theme. Posts here aren't on a different platform pretending to be {{siteName}} — they're {{siteName}} content with a publish date and a topic.
+
+Practical implication: when you bookmark a post or share a link, it's a real {{siteName}} URL. No tracking redirect, no third-party host.
+
+## 2. Categories and tags do different jobs
+
+- **Category** is the broad bucket — there's only one per post. Think "what section of the site does this belong to?"
+- **Tags** are cross-cutting — multiple per post. Think "what topics or themes does this touch?"
+
+If you're browsing, the **category archive** pages (linked from individual posts) give you the topical streams. The **tag archive** pages (also linked from posts) give you everything that mentions a specific subject across categories. Both are valid ways to discover content.
+
+## 3. Search engines see structured data
+
+Each post emits machine-readable structured data behind the scenes:
+- Article schema (title, dates, author, body)
+- Breadcrumb schema (Home → Blog → this post)
+- FAQ schema (when the post has FAQ items, like this one)
+
+That doesn't change anything for human readers, but it means search engines understand the content properly — including showing FAQ results in some queries directly in the search page. It's invisible plumbing that compounds over time.
+
+## A small note
+
+This is one of three [seed posts](/blog/01-welcome/) generated during integration. Real content will replace it. If you're reading this on a live site weeks after launch, someone forgot to delete the seed posts — kindly mention it.

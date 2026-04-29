@@ -8,6 +8,57 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.9] - 2026-04-29
+
+Closes four bugs surfaced by Nyxi's first-procedurally-clean integration:
+
+1. **Phase 7a footer-link check too lenient** — found ONE `/blog` link and passed; but multi-template sites (Wollongong Weather has 11+ templates: homepage, suburbs, illawarra, privacy, terms) need the link in EVERY footer-bearing file
+2. **Empty `/blog/` after install** — v0.3.4's "delete demo posts" rule was over-correction; with no posts there's nothing to visually verify in Phase 5
+3. **SiteShell ports were lossy** — agents copied structure but stripped content (Nyxi's port had ~5 footer links; host had 12+)
+4. **Nav-link attestation was lie-able** — agent could attest "declined" while having added the link to host nav. Doctor never verified ground truth.
+
+### Added: `seed-posts` subcommand
+
+```bash
+cd _blog
+npx shipwreck-blog-doctor seed-posts
+```
+
+Generates 3 site-themed seed posts (welcome / three-things / getting-started) by templating from `packages/blog-core/src/templates/seed-posts/*.mdx`. Templates have `{{siteName}}`, `{{baseUrl}}`, `{{today}}`, `{{authorId}}`, `{{authorName}}` placeholders filled from the consumer's `site.config.ts`. Posts include:
+
+- FAQ items (3, 3, and 5 questions across the three) — exercises FAQ schema rendering
+- Varied lengths — short / medium / long — exercises typography + ToC behavior
+- Internal links between posts — exercises related-posts and inline link rendering
+- A seed author file (`seed-author.json`) — exercises AuthorBio component
+
+Each post explicitly self-identifies as seed content in its body so real visitors aren't confused if they land on one before replacement. The slugs (`01-welcome`, `02-three-things`, `03-getting-started`) are intentionally different from engine demo posts — doctor's demo-content check still passes.
+
+### Added: Phase 7 host-side ground-truth verification
+
+Default doctor mode now walks the entire site repo (skipping `_blog/`, `blog/`, `node_modules/`, `.git/`), classifies every `/blog` link as nav-context vs footer-context, and cross-checks against the state file's nav-link attestation:
+
+- **Footer coverage**: counts files with `<footer>` markup; fails if `/blog` link missing from >50% of them; warns if >10% missing. Catches multi-template sites where one template has the link and others don't.
+- **Nav-link state-vs-truth cross-check**: state says "declined" but link found in nav markup → fatal "agent added the link without permission AND lied to doctor." State says "approved" but no link in nav → fatal "attestation contradicts host markup."
+- **SiteShell fidelity check**: counts `<a>` tags + content length in blog `Footer.astro`; compares to host's largest footer block; warns if blog footer has <60% the links or <40% the content. Catches "ported the structure but stripped the content."
+
+### Skill updates
+
+- **New Phase 1.5** — "Replace demo content with seed posts (mandatory)". Recommends `seed-posts`; alternative is real content via add-post skill; explicitly forbids leaving the posts dir empty.
+- **Phase 3 rewritten** — strong "PORT VERBATIM" framing with explicit anti-patterns (don't simplify, don't drop attribution, don't replace logos with placeholders). New rule: don't add `/blog/` link to nav at this stage — that's Phase 7b. Step-by-step process. Verification command.
+
+### Why these are surfacing now
+
+The v0.3.5–0.3.8 hardening fixed agent procedural drift (skipping phases). Now that the agent is following the procedure, the QUALITY of execution within each phase becomes the bottleneck. v0.3.9 adds quality gates that catch:
+- Hand-wavy partial work (footer link in one template only)
+- Lazy ports that lose content fidelity (SiteShell stripped)
+- Lying to doctor (state file vs actual host)
+
+42/42 acceptance tests still passing. No contract version change (still `1`); these are additive checks, not contract semantics.
+
+### Migration
+
+`npm update @shipwreck/blog-core` picks up the new doctor + templates. No template-side changes for consumer sites. Existing v0.3.8 sites that pass new doctor are still in good shape; ones that don't will surface specific issues to fix.
+
 ## [0.3.8] - 2026-04-29
 
 Adds standardized integration timing capture. Triggered by Nyxi's first successfully-procedural integration (3m 42s manually clocked) — the user wanted timing as a standard data point per install.

@@ -238,6 +238,44 @@ Commit at this point: `git add -A && git commit -m "feat: scaffold blog at _blog
 
 ---
 
+## Phase 1.5 — Replace demo content with seed posts (mandatory)
+
+> **Precondition:** Phase 1 done.
+>
+> **Done-check:** `_blog/src/content/posts/` does NOT contain `hello-world.mdx`, `seo-checklist.mdx`, or `why-not-wordpress.mdx`. AND it contains at least 1 valid post (seed or real). Demo `jane.json` author removed. Doctor returns no "Demo posts still in src/content/posts/" finding.
+
+The engine demo ships with three example posts and a demo author. They must NOT ship to production. AND the blog can't be visually verified empty — Phase 5 needs at least 1 post to render meaningfully.
+
+### Recommended: replace with site-themed seed content via `seed-posts`
+
+```bash
+cd _blog
+rm -f src/content/posts/hello-world.mdx \
+      src/content/posts/seo-checklist.mdx \
+      src/content/posts/why-not-wordpress.mdx \
+      src/content/authors/jane.json
+npx shipwreck-blog-doctor seed-posts
+```
+
+The `seed-posts` subcommand generates 3 site-themed seed posts (welcome / three-things / getting-started) with:
+- FAQ items (so FAQ schema can be tested)
+- Varied lengths — short / medium / long (typography + ToC behavior)
+- Internal links between them (related-posts, link rendering)
+- A seed author file
+- Each post explicitly self-identifies as seed content in its body, so a real visitor isn't confused if they land on one before replacement
+
+These let the user visually verify the integration. The user keeps, edits, or deletes them when real content lands. Doctor's demo-content check passes because the slugs/content are different from engine boilerplate.
+
+### Alternative: write real posts immediately
+
+If the user has prepared real content, use the [add-shipwreck-blog-post skill](add-shipwreck-blog-post.md). At least 1 published post is required before Phase 5.
+
+### NOT valid: leave the posts dir empty
+
+A blog with zero posts shows "No posts here yet." Acceptable as a transient state but not as a closeout state — Phase 5 visual verification can't validate post rendering, FAQ schema, or related-posts widgets without posts. Always seed or write at least 1 post before Phase 5.
+
+---
+
 ## Phase 2 — Extract host design tokens
 
 > **Precondition:** Phase 1 done.
@@ -258,24 +296,52 @@ Fill `_blog/src/styles/tokens.css` using [TOKEN-CONTRACT.md](../../packages/blog
 
 ---
 
-## Phase 3 — Port the SiteShell (header + footer)
+## Phase 3 — Port the SiteShell (header + footer) — PORT VERBATIM
 
 > **Precondition:** Phase 2 done.
 >
-> **Done-check:** `_blog/src/components/SiteShell/Header.astro` shows the host's actual nav. `_blog/src/components/SiteShell/Footer.astro` shows the host's actual footer. Neither file contains the comment `Replace this with the host site's...`. Doctor's default mode does NOT flag SiteShell as still placeholder.
+> **Done-check:** `_blog/src/components/SiteShell/Header.astro` shows the host's actual nav. `_blog/src/components/SiteShell/Footer.astro` shows the host's actual footer. Neither contains the placeholder. Doctor's SiteShell fidelity check (blog footer's `<a>` count + content length within ~60% of host's largest footer) passes — i.e. doctor does NOT flag "SiteShell Footer.astro looks simplified vs host footer."
 
-Copy the host's existing header/footer markup into:
-- `_blog/src/components/SiteShell/Header.astro`
-- `_blog/src/components/SiteShell/Footer.astro`
+### ⚠️ The single biggest historical failure of this phase
 
-Conversion rules:
-- React/Vue/Nuxt → Astro: `className` → `class`, no JSX expressions
-- Drop client-only state unless the blog needs it
-- Keep all nav menu items intact
-- Add a "Blog" link to the nav if not present
-- Preserve all utility classes verbatim
+Agents copy the structure but strip out the content. They keep `<header>` and `<footer>` and the major elements, but drop sub-sections, secondary links, attribution lines, brand-block content. The result looks "right-shaped" but is dramatically less than the host's actual footer/header — and the user notices immediately.
+
+**The rule:** copy the host's header and footer markup **verbatim** (every section, every link, every text block), then convert framework-specific syntax to Astro. The blog's SiteShell should match the host's SiteShell line-for-line in content, only differing where Astro syntax requires it.
+
+If the host's footer has 12 links, your `Footer.astro` should have 12 links. If it has 4 sub-sections (brand block, sitemap-style nav, social, copyright/legal), yours should have all 4. If it has a fine-print attribution line at the bottom, keep it.
+
+### Process
+
+1. Open the host's actual footer file (typically `<host-repo>/index.html` or a layout/template file). Read every line.
+2. Copy the entire `<footer>...</footer>` block (or equivalent component) into `_blog/src/components/SiteShell/Footer.astro`.
+3. Convert syntax: `className` → `class`, drop JSX expressions, replace framework `<Link>` with `<a href="...">`, remove client-only state if the blog won't use it.
+4. Keep ALL utility classes verbatim — they'll resolve correctly because Phase 2 tokens are now in place.
+5. Repeat for the header.
+
+### Strict rules for nav links
+
+- Do NOT add a `/blog/` link to the host's main nav at this stage. That decision is Phase 7b — it requires user approval first. If you add a nav link here, doctor's nav-link cross-check will fail in default mode.
+- DO copy any existing nav links from the host's nav verbatim.
+
+### What NOT to do
+
+- Do NOT consolidate footer sub-sections to "simplify" the layout. The user wants the host's footer, not a "cleaner" version.
+- Do NOT drop attribution lines (e.g. "Site by X", data-source credits). They're part of the host's identity.
+- Do NOT replace logos/brand blocks with placeholders. If the host has a complex logo SVG, port it.
 
 If the host loads Google Fonts via `<link>`, port the same `<link>` into `_blog/src/layouts/BaseLayout.astro` `<head>`.
+
+### Verification
+
+```bash
+# Eye-check: open both the host homepage and the blog index in your browser.
+# The footers should be visually indistinguishable.
+
+# Doctor check (lite mode, skip build for speed):
+npx shipwreck-blog-doctor --lite --skip-build
+# Should report: "SiteShell Footer.astro has comparable content density to host footer"
+# If it warns "looks simplified vs host footer" — re-port verbatim before proceeding.
+```
 
 ---
 
