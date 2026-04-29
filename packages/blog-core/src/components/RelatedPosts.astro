@@ -6,8 +6,10 @@ interface Props {
   posts: Array<{ id: string; data: Post }>
   basePath: string
   title?: string
-  /** "grid" = 3-up horizontal at md+ (default). "stack" = vertical stack. */
+  /** "grid" = horizontal cards (default). "stack" = vertical list. */
   layout?: "grid" | "stack"
+  /** Card visual style. "card" (default) = bordered/elevated. "list" = list item with bottom border. */
+  variant?: "card" | "list"
 }
 
 const {
@@ -15,21 +17,28 @@ const {
   basePath,
   title = "Related articles",
   layout = "grid",
+  variant = "card",
 } = Astro.props
+
+// Adapt the grid to the number of posts so a single related post doesn't
+// sit alone in a 3-col grid with two empty cells.
+const gridCols = posts.length >= 3
+  ? "md:grid-cols-3"
+  : posts.length === 2
+    ? "md:grid-cols-2"
+    : ""
+
+const containerClass = layout === "grid"
+  ? `grid grid-cols-1 gap-5 ${gridCols}`
+  : "space-y-5"
 ---
 
 {posts.length > 0 && (
-  <section class="mt-16 border-t border-border pt-10">
-    <h2 class="mb-8 font-heading text-2xl font-semibold text-primary">{title}</h2>
-    <div
-      class:list={[
-        layout === "grid"
-          ? "grid grid-cols-1 gap-6 md:grid-cols-3"
-          : "space-y-6",
-      ]}
-    >
+  <section class="mt-12 border-t border-border pt-8">
+    <h2 class="mb-6 font-heading text-xl font-semibold text-primary">{title}</h2>
+    <div class={containerClass}>
       {posts.map((post) => (
-        <PostCard post={post} basePath={basePath} />
+        <PostCard post={post} basePath={basePath} variant={variant} />
       ))}
     </div>
   </section>

@@ -4,29 +4,35 @@ import type { Post } from "../schemas/post.js"
 interface Props {
   post: { id: string; data: Post }
   basePath: string
+  /** "card" (default) — bordered, padded, hover-elevates. "list" — bottom-bordered list item, no frame. */
+  variant?: "card" | "list"
 }
 
-const { post, basePath } = Astro.props
+const { post, basePath, variant = "card" } = Astro.props
 const href = `${basePath.replace(/\/$/, "")}/${post.id}/`
 const image = post.data.featuredImage
 const altText = post.data.featuredImageAlt ?? post.data.title
+
+const wrapperClass = variant === "list"
+  ? "border-b border-border pb-6 last:border-b-0"
+  : "group rounded-card border border-border bg-bg/40 p-5 transition-colors hover:border-accent/60 hover:bg-bg/60"
 ---
 
-<article class="border-b border-border pb-6 last:border-b-0">
-  <a href={href} class="group block">
+<article class={wrapperClass}>
+  <a href={href} class:list={["block", variant === "list" && "group"]}>
     {image && (
       <img
         src={image}
         alt={altText}
-        class="mb-3 aspect-[16/9] w-full rounded-card object-cover"
+        class="mb-4 aspect-[16/9] w-full rounded-card object-cover"
         loading="lazy"
       />
     )}
-    <h2 class="font-heading text-2xl font-semibold text-primary group-hover:text-accent">
+    <h3 class="font-heading text-lg font-semibold leading-snug text-primary group-hover:text-accent">
       {post.data.title}
-    </h2>
-    {post.data.excerpt && <p class="mt-2 text-muted">{post.data.excerpt}</p>}
-    <p class="mt-2 text-sm text-muted">
+    </h3>
+    {post.data.excerpt && <p class="mt-2 text-sm leading-relaxed text-muted">{post.data.excerpt}</p>}
+    <p class="mt-3 text-xs uppercase tracking-wide text-muted/80">
       <time datetime={post.data.publishDate.toISOString()}>
         {post.data.publishDate.toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric" })}
       </time>

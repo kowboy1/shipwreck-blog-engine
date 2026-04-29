@@ -170,7 +170,7 @@ const heroImage = post.data.featuredImage
         </div>
 
         {post.data.tags && post.data.tags.length > 0 && (
-          <div class="mt-10">
+          <div class="mt-10 border-t border-border pt-6">
             <TagList tags={post.data.tags} basePath={siteConfig.blogBasePath} />
           </div>
         )}
@@ -183,13 +183,13 @@ const heroImage = post.data.featuredImage
           />
         ))}
       </article>
-    </ArticleLayout>
 
-    <RelatedPosts
-      posts={bottomGridPosts}
-      basePath={siteConfig.blogBasePath}
-      title="More articles"
-      layout="grid"
-    />
+      <RelatedPosts
+        posts={bottomGridPosts}
+        basePath={siteConfig.blogBasePath}
+        title="More articles"
+        layout="grid"
+      />
+    </ArticleLayout>
   </div>
 </BaseLayout>
