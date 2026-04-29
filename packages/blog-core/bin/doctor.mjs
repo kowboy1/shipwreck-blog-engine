@@ -45,6 +45,17 @@ import { join, resolve, dirname, basename } from "node:path"
 import { execSync } from "node:child_process"
 import process from "node:process"
 
+// Completion contract version. Bumped only when the contract between
+// shipwreck-blog-doctor and the OpenClaw-side runtime skill changes
+// (e.g., new required attestation, removed subcommand, changed semantic
+// meaning of an existing subcommand). Engine versions can release without
+// bumping this — only contract-shape changes warrant a bump.
+//
+// Runtime skill at ~/.openclaw/skills/shipwreck-final-gate/SKILL.md should
+// declare the contract version it expects. Mismatches mean the runtime
+// layer needs review.
+const COMPLETION_CONTRACT_VERSION = 1
+
 const argv = process.argv.slice(2)
 const args = new Set(argv)
 const PREFLIGHT = args.has("--preflight")
@@ -52,6 +63,14 @@ const LITE = args.has("--lite")
 const SKIP_BUILD = args.has("--skip-build") || PREFLIGHT
 const JSON_OUT = args.has("--json")
 const CWD = process.cwd()
+
+// --contract-version: prints just the contract version and exits. Used by
+// runtime layer to sanity-check it's compatible before invoking the rest
+// of the doctor.
+if (args.has("--contract-version")) {
+  console.log(COMPLETION_CONTRACT_VERSION)
+  process.exit(0)
+}
 
 // Default invocation = full closeout gate (formerly --final). Reversed in v0.3.6.
 const FULL = !PREFLIGHT && !LITE
@@ -288,7 +307,11 @@ completion message to emit.
       : `Nav link: not asked (FAIL — should not have reached here)`
 
   // The audit-trail block. This is the ONLY valid completion message format.
+  // The completion_contract_version line is parsed by the OpenClaw runtime
+  // skill to confirm the engine is producing compatible output. Don't remove
+  // or rename without bumping COMPLETION_CONTRACT_VERSION above.
   console.log(`Integration done. Verifications:
+- completion_contract_version: ${COMPLETION_CONTRACT_VERSION}
 - shipwreck-blog-doctor: ✓ all checks passed (default mode = full closeout gate)
 - Engine version: ${engineVersion}
 - Site: ${siteName} (${domain})

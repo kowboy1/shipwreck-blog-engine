@@ -8,6 +8,41 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-04-29
+
+Adopts Nyxi's governance recommendation from `FEEDBACK-FOR-CLAUDE-final-gate-governance.md`. The runtime layer (OpenClaw-side AGENTS.md + final-gate skill) and the project layer (engine repo skill) are explicitly separated by a versioned contract. Runtime layer stays stable across engine bumps unless the completion contract itself changes.
+
+### Added
+
+- **`COMPLETION_CONTRACT_VERSION`** (currently `1`) at the top of `packages/blog-core/bin/doctor.mjs`. Bumped only when the contract between doctor and the runtime layer changes — not on routine engine releases.
+- **`--contract-version` flag** on doctor: `npx shipwreck-blog-doctor --contract-version` prints just the integer version. Runtime skill can use this for sanity-check compatibility before invoking the rest of the doctor.
+- **`completion_contract_version: <N>`** line as the first verification entry in `print-completion` stdout. Runtime layer parses this to confirm it's getting compatible output.
+- **Single-line completion-output directive** at the top of the integration skill AND near the final blocking checkpoint:
+  > Completion output to the user must be exactly the stdout of `npx shipwreck-blog-doctor print-completion`. Any other completion format is invalid.
+- **Release-hygiene checklist** in `CONTRIBUTING.md`. Before tagging a release, contributors answer: "Did the completion contract semantics change?" If yes, bump `COMPLETION_CONTRACT_VERSION` and notify the runtime layer maintainer. If no (most releases), leave it alone.
+
+### Why this matters
+
+Runtime files (OpenClaw-side `AGENTS.md` + `shipwreck-final-gate` skill) survive `/new` resets and inject behavior into every Nyxi session. Auto-syncing them with each engine bump would create:
+
+- Drift between repo skill and runtime skill
+- Duplicated change surface
+- Hard-to-debug contradictions when one updates before the other
+
+The contract version primitive lets the runtime layer reference a stable interface (`completion_contract_version: 1`) instead of tracking individual command names. Engine can ship 0.3.7, 0.3.8, 0.3.9... — runtime layer only needs review when contract version changes.
+
+### Migration
+
+No changes for consumer sites or for runtime files installed under v0.3.6. Contract version 1 is what the v0.3.6 runtime drafts implicitly assume; v0.3.7 just makes it explicit and queryable.
+
+If you're updating the runtime layer drafts, append:
+
+```
+This skill expects shipwreck-blog-doctor completion contract version 1.
+Run `npx shipwreck-blog-doctor --contract-version` to verify before
+relying on attest-* / print-completion semantics.
+```
+
 ## [0.3.6] - 2026-04-29
 
 Closes the agent-procedural-drift gap that prose alone could not. Direct response to Nyxi's third integration attempt where she did the technical work but skipped Phase 7 (host wiring), Phase 9 (post-install questions), feedback writing, and the audit-trail status message — all of which the skill explicitly required. Her own diagnosis: "the missing enforcement is machine-level gating, not prose reminders." This release adds the machine-level gating.

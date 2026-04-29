@@ -73,6 +73,28 @@ One-off handover docs (briefs for a specific job) ARE allowed to be specific —
 4. Does this need to propagate to existing sites? → Make sure the change lives inside the package (not in per-site templates). Consumer sites should only need `npm update + rebuild`, not template patches.
 5. Does this change something that affects how the engine works at a conceptual level (build flow, deploy mechanism, what runs where, trade-offs)? → Update [HOW-IT-WORKS.md](HOW-IT-WORKS.md) and bump the "_Last reviewed for engine version_" note at the top. That doc is for humans understanding the project end-to-end and must stay accurate as the architecture evolves.
 
+## Release hygiene checklist (run before tagging any release)
+
+The OpenClaw-side runtime skill (`~/.openclaw/skills/shipwreck-final-gate/SKILL.md`) and workspace AGENTS.md rule are NOT auto-synced with engine releases. They live at the agent runtime layer and are intentionally stable across many engine bumps — they only need updating when the **completion contract** itself changes.
+
+Before tagging a release, answer:
+
+1. **Did the completion contract semantics change?** Specifically:
+   - Were any `attest-*` subcommands added, removed, or renamed?
+   - Did the required arguments to any `attest-*` subcommand change (e.g., new required key in `attest-phase9`'s JSON, different number of args)?
+   - Did `print-completion`'s stdout format change in a way the runtime layer needs to know about?
+   - Did the meaning of "done" change (e.g., new required phase or attestation)?
+2. If **yes** to any of the above:
+   - Bump `COMPLETION_CONTRACT_VERSION` at the top of `packages/blog-core/bin/doctor.mjs`
+   - Note the contract bump prominently in the CHANGELOG entry
+   - Send a heads-up to whoever maintains the OpenClaw-side runtime files (typically the user — they manually update `~/.openclaw/workspace/AGENTS.md` and `~/.openclaw/skills/shipwreck-final-gate/SKILL.md` to reference the new contract version)
+3. If **no** (most releases):
+   - Leave `COMPLETION_CONTRACT_VERSION` alone
+   - Runtime layer needs no changes
+   - Consumers benefit from engine fixes without the runtime layer being touched
+
+This separation keeps the runtime layer thin and stable while the project layer evolves freely with each release.
+
 ## Testing changes
 
 Manual for now:

@@ -1,6 +1,6 @@
 {
   "name": "@shipwreck/blog-theme-default",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Default Tailwind preset and theme tokens for Shipwreck Blog",
   "type": "module",
   "main": "./tailwind-preset.js",

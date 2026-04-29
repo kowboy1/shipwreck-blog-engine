@@ -7,6 +7,8 @@ description: Integrate the Shipwreck Blog Engine into a host site. Triggers when
 > ⚠️ **STOP** — if you opened this directly without reading [AGENTS.md](../../AGENTS.md), go read AGENTS.md first.
 > AGENTS.md contains the universal rules every agent must follow before starting any job. This file is the runbook AGENTS.md routes you to for the install job.
 
+> 🔒 **Completion contract** — completion output to the user must be exactly the stdout of `npx shipwreck-blog-doctor print-completion`. Any other completion format is invalid. (See [final blocking checkpoint](#-completion-contract--only-one-valid-path-to-done) for the full procedure.)
+
 You are integrating `@shipwreck/blog-engine` into a host site. **This skill is hosting-, DNS-, and CDN-agnostic.** It works for any host that can serve static files (every cPanel tier, Plesk, DirectAdmin, OpenLiteSpeed, raw nginx/Apache, S3+CloudFront, Cloudflare Pages, Netlify, Vercel, GitHub Pages, a self-hosted VPS, an old-school FTP-only shared host — anything).
 
 The end state:
@@ -405,6 +407,8 @@ For each yes: do the work and verify. For each no/later: log it in `<site-repo>/
 ---
 
 ## 🛑 Completion contract — only one valid path to "done"
+
+> 🔒 **Reminder:** completion output to the user must be exactly the stdout of `npx shipwreck-blog-doctor print-completion`. Any other completion format is invalid.
 
 Default `npx shipwreck-blog-doctor` (no flags) is the closeout gate as of v0.3.6. It runs all install + Phase 2/3/5 checks AND requires three attestations from a state file. **You cannot reach 0 fatal without those attestations**, and writing them requires running specific subcommands that themselves require concrete proof.
 
