@@ -8,6 +8,77 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-04-29
+
+**Architectural simplification** — eliminates the per-site blog repo concept entirely. Blog source now lives inside the host site's repo at `_blog/`. Removes ~5 moving parts per integration. Per the project's patch-only versioning rule this stays 0.3.x; under strict SemVer it would be a minor or major bump (it's a breaking change to the integration model). Existing sites can migrate by moving `_blog/` into their host repo + redeploying via the host's existing pipeline.
+
+### Removed (the old per-blog-repo machinery)
+
+- `scripts/shipwreck-updater.php` — universal self-updater PHP script
+- `scripts/install-updater.sh` — one-shot installer for the updater
+- `.github/workflows/release-dispatch.yml` — engine-side fan-out workflow
+- `templates/site-blog-build.yml` — per-blog-repo CI template
+- `templates/` directory entirely
+
+### Changed (architecture)
+
+- **Blog source lives inside the host site's repo** at `_blog/` — there is NO separate per-site blog repo. If the host has no repo yet, the integration skill's new Phase 0 creates an entire-site repo with a recommended structure (the blog is just a subdir).
+- **Updates propagate via the host site's existing deploy mechanism** — whatever the host already does for its own files (Cloudflare Pages auto-deploy, rsync to VPS, SFTP to cPanel, manual upload, etc.) carries the blog along. No central polling infrastructure needed.
+- **Site repos double as backup snapshots** — `.gitignore` is intentionally minimal (only truly transient: `node_modules`, `.astro`, `_blog/dist`). Built `blog/` dist gets committed when host deploys via git push (Cloudflare Pages, Netlify, etc.); gitignored when deploy is rsync/SFTP. Either way the repo is a complete restorable site snapshot.
+
+### Skill rewrite (`.claude/skills/integrate-shipwreck-blog.md`)
+
+Massively simplified:
+- Removed Mode A/B/C/D deploy modes — there's just one flow now
+- New **Phase 0** — establish the site repo (skip if one exists, create a whole-site repo if not)
+- Phase 1 explicitly says: blog goes in `<site-repo>/_blog/`. NEVER in a separate repo.
+- Phase 6 (deploy) is now "use whatever the host site already uses to publish files"
+- Phase 1.5 (demo content cleanup) folded into Phase 1
+- Critical-model-concept callout updated: "one repo per site, blog included" replaces the old "two repos kept separate"
+- Failure-modes list adds "Let me create a separate blog repo for this site → STOP. The blog goes inside the site repo."
+
+### Site registry (`.shipwreck/sites.json`)
+
+Schema simplified:
+- Removed: `deploy.method`, `deploy.fallback`, `deploy.server`, `deploy.sshHost`, `deploy.sshUser`, `deploy.remotePath`, `source.repo`, `source.localPath`, `source.blogSourcePath`, `cloudflare.*`, `goldenScreenshots`
+- Kept (minimal): `name`, `domain`, `blogPath`, `blogSourcePath`, `engineVersion`, `lastDeployed`, `owner`, `notes`
+- Bootstrap entry removed — registry starts empty for v0.3.5; sites get added during integration Phase 8
+
+### New: `.shipwreck-site.json` per site
+
+Each integrated site gets a `.shipwreck-site.json` at the root of its own repo with minimal metadata:
+
+```json
+{
+  "name": "<site-name>",
+  "domain": "<domain>",
+  "engineVersion": "0.3.5",
+  "lastDeployed": "<ISO-8601>",
+  "deployMechanism": "<git-push-cf-pages | rsync-to-vps | sftp-cpanel | etc.>",
+  "notes": ""
+}
+```
+
+This file lives in the site's own repo (not the engine's). Surfaces the integration state to anyone working in that repo.
+
+### Migration from 0.3.4
+
+For each existing site running v0.3.4 with the per-blog-repo pattern:
+
+1. In the host site's repo, add `_blog/` (move from the old `<site>-blog` repo)
+2. Build: `cd _blog && npm install && npm run build`
+3. Copy `dist/` → `<host-docroot>/blog/` and commit it (or rsync, depending on host's deploy)
+4. Deploy via host's existing mechanism
+5. Update `<site-repo>/.shipwreck-site.json` with engine version
+6. Delete the old `<site>-blog` GitHub repo (after confirming the new layout works)
+7. Remove `shipwreck-updater.php` and the cron line from the host (no longer used)
+
+For sites running `0.3.5` from a fresh integration, no migration step needed.
+
+### Why this is the right call
+
+The previous architecture solved "self-update on an unmanaged host" — a problem we don't actually have. Every site we deploy to already has an active maintenance/backup workflow. Reusing the host's existing deploy mechanism removes complexity without losing capability. The skill is simpler, the integration is faster, and there's one less GitHub repo per site to keep clean.
+
 ## [0.3.4] - 2026-04-29
 
 Closes the gap between "skill says do X" and "agent actually does X." Triggered by Nyxi's third integration attempt — she did Phases 1–3 correctly but skipped Phase 1.5 (demo content cleanup), Phase 9 (post-install questions), and the feedback-protocol step despite the skill describing all three. Plus uncovered a critical cascade-order bug that silently overrode all her Phase 2 work.

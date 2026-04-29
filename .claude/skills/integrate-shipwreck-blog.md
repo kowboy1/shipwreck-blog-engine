@@ -1,5 +1,5 @@
 ---
-description: Integrate the Shipwreck Blog Engine into a host site. Triggers when the user says "add the blog", "install shipwreck blog", "drop the blog into <site>", or sets up `@shipwreck/blog-core` for a new property. Produces a themed, building blog at /blog/ that visually matches the host AND is self-updating (pulls new engine releases via daily cron).
+description: Integrate the Shipwreck Blog Engine into a host site. Triggers when the user says "add the blog", "install shipwreck blog", "drop the blog into <site>", or sets up `@shipwreck/blog-core` for a new property. Produces a themed, building blog at /blog/ that visually matches the host. Blog source goes inside the host site's repo — there is NO separate per-blog repo.
 ---
 
 # Skill — Integrate Shipwreck Blog into a Host Site
@@ -11,622 +11,458 @@ You are integrating `@shipwreck/blog-engine` into a host site. **This skill is h
 
 The end state:
 
-1. A **per-site source repo** (typically on GitHub) holds the blog source — site config, theme tokens, SiteShell, content/posts, content/authors. A CI workflow builds the static blog and publishes a tarball release on every engine update.
-2. The **host site** serves the built blog at `<docroot>/blog/` (or whatever subpath was chosen). For hosts with PHP+cron, `shipwreck-updater.php` runs daily and self-updates. For hosts without PHP, an external runner (or scheduled GitHub Action) pushes the build via SSH/SFTP/FTP.
-3. The blog is **themed to look native** to the host site.
+1. The host site has a git repo (created here if it doesn't already have one — Phase 0).
+2. The blog source lives **inside that repo** at `_blog/` — NOT in a separate per-blog repo. There is one repo per site, blog included.
+3. The built blog dist is served at `<host-docroot>/blog/` via the host's existing deploy mechanism (whatever that is — git push to Cloudflare Pages, rsync to a VPS, FTP to cheap cPanel, etc.).
+4. The blog is **themed to look native** to the host site.
+
+---
+
+## 🔥 Critical model concept — only ONE repo per site
+
+There is **never** a separate "blog repo." There is **only ever** the host site's repo, with `_blog/` inside it. If the host doesn't have a repo yet, **Phase 0 creates an entire-site repo** with a recommended structure (the blog is just a subdirectory of that).
+
+The previous version of this engine had a per-blog repo pattern. It was over-engineered. Reverted in v0.3.5. **Do not re-introduce it.** If you find yourself running `gh repo create <site>-blog` you are doing the wrong thing — `gh repo create <site>` (singular, the whole site) is the correct command.
 
 ---
 
 ## 🚦 Done definition (read this BEFORE starting)
 
-The integration is **NOT done** until ALL of the following are true. If you can't tick every box, the integration isn't done — keep going.
+The integration is **NOT done** until ALL of the following are true:
 
-- [ ] Every phase below has its precondition satisfied AND its done-check satisfied
-- [ ] `src/styles/tokens.css` exists with every TOKEN-CONTRACT.md token filled with a host-derived value
-- [ ] `src/components/SiteShell/Header.astro` shows the host's actual nav (not the engine's "Home / Blog" placeholder)
-- [ ] `src/components/SiteShell/Footer.astro` shows the host's actual footer (not the placeholder)
-- [ ] `npm run doctor` reports zero fatal issues (run from the per-site repo)
-- [ ] Visual diff between host homepage and blog page passes <5% per region
-- [ ] `.shipwreck/sites.json` has this site's entry filled in
-- [ ] You have asked the user the **Phase 9 post-install integration questions** (latest-3 callout, RSS link, GSC submission, cross-links, Sveltia CMS) and acted on the answers
-- [ ] Either: a `FEEDBACK-FOR-CLAUDE-<job>.md` exists in the engine repo, OR you have explicitly told the user "no engine feedback this run"
-- [ ] Either: a stack-notes session log exists, OR you have explicitly told the user "no new stack-specific quirks observed"
+- [ ] Every phase below has its precondition AND its done-check satisfied
+- [ ] `_blog/src/styles/tokens.css` has every TOKEN-CONTRACT.md token filled with a host-derived value
+- [ ] `_blog/src/components/SiteShell/Header.astro` shows the host's actual nav (not the placeholder)
+- [ ] `_blog/src/components/SiteShell/Footer.astro` shows the host's actual footer (not the placeholder)
+- [ ] `_blog/src/content/posts/` does NOT contain demo posts (`hello-world.mdx`, `seo-checklist.mdx`, `why-not-wordpress.mdx`)
+- [ ] `npx shipwreck-blog-doctor --final --phase9-confirmed --feedback-status=<provided|none-needed>` returns 0 fatal
+- [ ] Live blog at `https://<domain>/blog/` visually matches the host
+- [ ] `.shipwreck/sites.json` in the engine repo has this site's entry
+- [ ] You have asked the user the **Phase 9 questions** in this session and acted on the answers
+- [ ] Either `FEEDBACK-FOR-CLAUDE-<job>.md` exists in the engine repo OR you have explicitly declared "no engine feedback this run"
 
-**If you skip any of these and report "done", the user will catch it.** This isn't paranoia — it's literally what happened on the previous integration. Save them the round-trip.
+If you can't tick every box, the integration isn't done.
 
 ---
 
 ## ⛔ Phase gates (every phase has them — do not skip)
 
 Each phase has:
-- **Precondition** — must be true to *start* the phase. If false, return to the previous phase.
-- **Done-check** — must be true to *finish* the phase. If false, the phase is not done, regardless of what you've already done in it.
+- **Precondition** — must be true to *start*. If false, return to the previous phase.
+- **Done-check** — must be true to *finish*. If false, the phase is not done.
 
-Treat these as hard gates. The skill is structured this way because skipping phases produces broken integrations that look superficially OK at first.
-
----
-
-**Don't improvise.** Follow the procedure. If a precondition or done-check fails, the phase is not in the state you think it is.
+Treat these as hard gates. Skipping phases produces broken integrations that look superficially OK at first.
 
 ---
 
 ## Inputs you need before starting
 
-These come from the user's prompt, OR you look them up via Harbour Control (the dashboard tracks every site → server → DNS provider → access method). Don't guess.
+Get from the user OR look up in Harbour Control / vault. Don't guess.
 
 1. **Host site name and domain** — the live URL the blog will be added to
-2. **Hosting environment** — which server/platform the host site lives on (any cPanel tier, OpenLiteSpeed/CyberPanel box, dedicated VPS, Cloudflare Pages, Netlify, etc.). What matters: SSH/SFTP availability, whether it serves PHP, who has access.
-3. **DNS / CDN provider** — Cloudflare, AWS, the registrar's nameservers, etc. Only matters for the optional "purge cache after deploy" step. If unknown or no CDN, the engine works without it.
-4. **Where the blog mounts** — usually `/blog/`. **Locked in for the life of the site** — internal links bake the path in, so moving it later breaks every URL. Confirm with the user before proceeding if it's anything other than `/blog/`.
-5. **Whether a per-site source repo exists** — typically `<site-name>-blog` on the same git host as everything else. If not, Phase 1 creates one.
-6. **Where the host site's main nav lives** (which file or component) — for Phase 7 nav link
-7. **Where the host site's footer lives** — for Phase 7 footer link
+2. **Existing repo?** — does the host site already have a git repo? Where? (If no: Phase 0 creates one.)
+3. **Hosting environment + deploy mechanism** — how does the host site currently get from source to live? (Cloudflare Pages auto-deploy, Netlify, rsync to VPS, push to cPanel via SFTP, manual upload, etc.) The blog will use the same mechanism.
+4. **Where the blog mounts** — usually `/blog/`. Locked in for the life of the site.
+5. **Where the host's nav lives** (file/component) — for Phase 7 link
+6. **Where the host's footer lives** — for Phase 7 link
 
-If any are missing AND you can't infer them from Harbour Control, ask the user.
-
----
-
-## Choose a deploy mode FIRST (before any phases)
-
-Pick **one** of three modes based on the host's capabilities. They branch the runbook differently.
-
-### Mode A — Self-update pull (universal, default for live sites)
-
-The host can run PHP and cron. Daily cron hits a token-protected `shipwreck-updater.php` endpoint, which polls the per-site repo's GitHub Releases and atomically swaps in newer builds.
-
-**Use when:** the host runs on any cPanel / Plesk / DirectAdmin / OpenLiteSpeed / nginx+php-fpm / Apache+mod_php — basically anywhere that ships PHP. **This is the default.** If unsure, this is the right answer.
-
-**Includes:** all 9 phases. Per-site source repo, build CI, host-side updater install, cron, optional cache purge wiring, optional uptime monitor.
-
-**Does NOT require:** SSH access from us to the host, control over the DNS, a specific CDN, root, or anything beyond a normal cPanel control-panel account.
-
-### Mode B — Local-dev integration (no remote, no CI, no CDN)
-
-The site is being developed locally and isn't on a production host yet. Often served via a tunnel (Cloudflare Tunnel, ngrok, etc.) or a local dev server. No CI, no remote install, no cache purge.
-
-**Use when:** the user says "set it up locally", "I'll deploy later", or the host site is currently a local checkout on the developer's machine.
-
-**Skip:** the per-site repo's GitHub create, the host-side updater install, any CI workflows, uptime monitor.
-
-**Replace with:** local `npm run build` + copy `dist/` to `<host-site-checkout>/blog/`. Document the build-and-copy command in the per-site repo's README so it's reproducible.
-
-**Run normally:** Phases 2 (tokens), 3 (SiteShell), 4 (CTAs), 5 (visual verification), 7 (host wiring), 8 (registry, with `deploy.method: "manual"`).
-
-When the site goes to production later, re-enter at Phase 6 — the source is already built, just needs a remote + the updater install.
-
-### Mode C — Push from CI (when we control SSH but the host can't run the updater)
-
-The host has SSH/SFTP we can use, but we'd rather push than have the host pull. Useful when the host's PHP version is too old, or when sub-minute deploy latency matters. We build in a runner (GitHub Action, local machine) and push the dist via rsync/lftp.
-
-**Use when:** the user wants push-style deploy AND we have working SSH/SFTP credentials for the host.
-
-**Phases:** all 9, but Phase 6 uses `scripts/deploy-blog.mjs` instead of `install-updater.sh`. Cron lives on our runner, not the host.
-
-### Mode D — Hand-off to external host (we don't control the host at all)
-
-The host is owned by a third party we don't have any access to. We build the dist tarball; the host owner uploads it themselves.
-
-**Use when:** the user explicitly says "we don't have access to that server" or the host is owned by someone outside our reach.
-
-**Phases:** 1, 2, 3, 4, 5, 7 (host wiring done by the third party), 8 (registry, no monitor). Phase 6 produces the tarball + a one-page upload-instructions doc.
+Don't ask the user about deploy methods to the blog separately — there is no separate blog deploy. Whatever publishes the host site publishes the blog along with it.
 
 ---
 
-If unclear which mode applies, ask: "Does the host run PHP+cron and can I SSH/control-panel into it?" — if yes, Mode A. If it's local dev, Mode B. If yes-to-SSH-but-want-push, Mode C. If we can't touch the host, Mode D.
+## Phase 0 — Establish the site repo (skip if one already exists)
 
----
-
-## Critical model concept (read before Phase 1)
-
-Two repos, kept separate. **This applies regardless of which mode you chose.**
-
-- **Host site repo**: the existing live website. The blog is **NOT installed here**. The only changes you make to this repo are: a footer link, a nav link, and optionally a `robots.txt` reference to the blog sitemap. **Do not** add `_blog/` here. **Do not** add `_blog/node_modules` to its `.gitignore`. **Do not** put any blog Astro source here.
-- **Per-site blog repo**: a SEPARATE git repo (typically `<site-name>-blog`) containing only the blog source. Its CI builds + publishes release tarballs that the host's updater pulls (or that we push to the host).
-
-If you find yourself committing to the host repo for anything other than the footer/nav/robots integration in Phase 7, **stop** — you're in the wrong place.
-
----
-
-## Phase 1 — Create the per-site blog repo
-
-> **Precondition (must be true to start this phase):** All required inputs collected (host name + domain, hosting environment, blog mount path, per-site repo decision, where host's nav and footer live, deploy mode chosen). If any are missing, ask the user OR look up via Harbour Control before starting.
+> **Precondition:** All inputs collected.
 >
-> **Done-check (must be true before proceeding to the next phase):** Per-site repo exists with demo-site contents copied. file: dep paths in package.json have been updated to the actual relative path to the engine repo (verify with `ls node_modules/@shipwreck/blog-core/package.json` — must show a real file). `npm install` succeeded. `npx shipwreck-blog-doctor --skip-build` reports `✓ Engine package '@shipwreck/blog-core' resolves`. **If the doctor reports the engine package as unreachable, the file: dep path is wrong — fix it before proceeding to Phase 2.**
+> **Done-check:** Either: the host site already has a git repo (note its location, you'll add `_blog/` to it in Phase 1), OR a new repo exists with the recommended structure (described below) and the host's existing files committed to it.
 
+If the host site is already in a git repo (most common — Cloudflare Pages, Netlify, GitHub Pages all require it), use that repo. Note its location and skip to Phase 1.
 
-Each blog deployment needs its own GitHub repo for the source. Why a separate repo (not just a directory in the host site's repo): the consumer-site GH Action publishes its own releases, which the host pulls from. Decoupling content from the live site repo keeps deploys clean.
+If the host site has NO repo yet (rare — e.g. files-on-a-VPS without source control), **create one for the entire site** using this structure. The repo doubles as a backup snapshot of the site (per commit), so be conservative with `.gitignore`.
 
-```bash
-# Locally:
-mkdir -p ~/projects/<site-name>-blog
-cd ~/projects/<site-name>-blog
-git init -b main
+### Recommended site repo structure
 
-# Copy the demo-site contents into _blog/ (the workflow + skill assume this layout)
-mkdir -p _blog
-cp -r <path-to>/shipwreck-blog-engine/examples/demo-site/. _blog/
-
-# Copy the per-site build workflow template (Mode A only — skip in Mode B local-dev)
-mkdir -p .github/workflows
-cp <path-to>/shipwreck-blog-engine/templates/site-blog-build.yml .github/workflows/blog-build.yml
+```
+<site-name>/                       ← repo root
+├── README.md                      ← what the site is, deploy notes, engine version
+├── .gitignore                     ← only truly transient (see below)
+├── .shipwreck-site.json           ← site metadata
+│
+├── public/  (or wherever)         ← host site's existing files
+│   ├── index.html
+│   ├── about/, etc.
+│   ├── assets/
+│   ├── robots.txt
+│   └── ...
+│
+├── _blog/                         ← blog source (Phase 1+ adds this)
+│   ├── site.config.ts
+│   ├── astro.config.ts
+│   ├── tailwind.config.ts
+│   ├── package.json
+│   └── src/...
+│
+└── blog/                          ← built blog dist (served at /blog/)
+    └── (generated; commit if deploy is git-based, gitignore if rsync/sftp)
 ```
 
-### Fix engine package dep specifiers
+### `.gitignore` (minimal — repo doubles as backup)
 
-The demo-site's `_blog/package.json` ships with `file:../../packages/...` paths that resolve correctly inside the engine monorepo, but **break in a per-site sibling repo**. Update them to point at the local engine checkout:
+```gitignore
+# Build cache + deps (re-installable from package.json)
+node_modules/
+_blog/.astro/
+_blog/dist/
 
-```diff
-   "dependencies": {
--    "@shipwreck/blog-core": "file:../../packages/blog-core",
--    "@shipwreck/blog-theme-default": "file:../../packages/blog-theme-default",
-+    "@shipwreck/blog-core": "file:../../shipwreck-blog-engine/packages/blog-core",
-+    "@shipwreck/blog-theme-default": "file:../../shipwreck-blog-engine/packages/blog-theme-default",
+# Local secrets (never commit; use .env.example for documentation)
+.env
+.env.local
 ```
 
-Once the engine is published to npm (or a private GitHub Packages registry), switch these to versioned specifiers:
+That's it. Commit everything else — including the built `blog/` dist if the host deploys via git. The repo is a complete site snapshot; restoring is a `git clone` away.
+
+### `.shipwreck-site.json` template
 
 ```json
-"@shipwreck/blog-core": "^0.3.0",
-"@shipwreck/blog-theme-default": "^0.3.0",
+{
+  "name": "<site-name>",
+  "domain": "<domain>",
+  "engineVersion": null,
+  "lastDeployed": null,
+  "deployMechanism": "<git-push-cf-pages | rsync-to-vps | sftp-cpanel | netlify | etc.>",
+  "notes": ""
+}
 ```
 
-(Until then, the `file:` path is the canonical install method and works for both local dev and CI builds where the engine repo is checked out alongside.)
+### Creating the repo (if greenfield)
 
-**Edit `_blog/site.config.ts`** with the user's inputs:
+```bash
+mkdir <site-name> && cd <site-name>
+git init -b main
+# Move/copy host site files into ./public/ (or whatever layout exists)
+# Create README.md, .gitignore, .shipwreck-site.json from templates above
+git add -A
+git commit -m "chore: initial site repo"
+gh repo create <user-or-org>/<site-name> --private --source=. --remote=origin --push
+```
+
+If the user has no preference, default `--private` (the repo doubles as a backup; private is conservative). Confirm with the user.
+
+---
+
+## Phase 1 — Install the blog scaffold into the site repo
+
+> **Precondition:** Phase 0 done — site repo exists with the host's existing files committed.
+>
+> **Done-check:** `<site-repo>/_blog/` exists with the demo-site contents copied. file: dep paths in `_blog/package.json` updated to point at the local engine checkout. `cd _blog && npm install` succeeded. `npx shipwreck-blog-doctor --preflight` reports `✓ Engine package '@shipwreck/blog-core' resolves`. Demo content (`hello-world.mdx`, `seo-checklist.mdx`, `why-not-wordpress.mdx`) is REMOVED from `_blog/src/content/posts/`. Demo author `jane.json` is REMOVED.
+
+```bash
+cd <site-repo>
+
+# Copy the demo-site contents into _blog/ (the canonical source layout)
+mkdir -p _blog
+cp -r <path-to-engine>/examples/demo-site/. _blog/
+
+# Engine deps: file: paths from _blog/ resolving to the engine checkout.
+# Adjust the relative path to match your actual layout. For most cases:
+sed -i 's|file:../../packages/|file:<adjust-path>/shipwreck-blog-engine/packages/|g' _blog/package.json
+# Verify by inspecting the output paths.
+
+cd _blog
+npm install
+```
+
+**Verify symlinks resolve before continuing:**
+
+```bash
+ls node_modules/@shipwreck/blog-core/package.json    # must show a real file
+npx shipwreck-blog-doctor --preflight                 # must pass
+```
+
+If either fails, the `file:` path is wrong (typically too many or too few `../`). Fix the path in `_blog/package.json` and re-run `npm install`.
+
+**Then strip demo content (mandatory):**
+
+```bash
+# Remove demo posts — they're engine boilerplate, not real content for this site
+rm -f src/content/posts/hello-world.mdx \
+      src/content/posts/seo-checklist.mdx \
+      src/content/posts/why-not-wordpress.mdx
+
+# Remove demo author
+rm -f src/content/authors/jane.json
+```
+
+The blog can launch with zero posts (empty `posts/` dir is valid). Real content gets added later via the [add-shipwreck-blog-post skill](add-shipwreck-blog-post.md).
+
+**Edit `_blog/site.config.ts`** with the host's real values:
 
 ```ts
 import type { SiteConfig } from "@shipwreck/blog-core"
 
 const config: SiteConfig = {
-  siteName: "<SITE_NAME>",
-  baseUrl: "<BASE_URL>",
+  siteName: "<HOST_NAME>",
+  baseUrl: "<HOST_DOMAIN>",
   blogBasePath: "/blog",
   brand: {
-    organizationName: "<SITE_NAME>",
-    logoUrl: "/assets/logo.svg",
+    organizationName: "<HOST_NAME>",
+    logoUrl: "<path-to-host-logo>",
   },
   seo: {
-    defaultOgImage: "<BASE_URL>/assets/og-image.png",
-    locale: "en_AU",
+    defaultOgImage: "<host-og-image-url>",
+    locale: "<en_AU | en_US | etc.>",
   },
-  layout: {
-    postsPerPage: 10,
-    showReadingTime: true,
-    showAuthor: true,
-    showTableOfContents: true,
-    showRelatedPosts: true,
-    relatedPostsCount: 3,
-  },
-  ctaBlocks: { default: "default" },
+  // ...
 }
 export default config
 ```
 
-Push the repo to GitHub:
-```bash
-gh repo create 1tronic/<site-name>-blog --private --source=. --remote=origin --push
-```
-
-**Verify Phase 1:**
-```bash
-cd _blog && npm install && npm run dev
-# open http://localhost:4321/blog/ — should render unstyled blog with demo MDX post
-```
-
----
-
-## Phase 1.5 — Replace demo content (mandatory)
-
-> **Precondition:** Phase 1 done.
->
-> **Done-check:** `src/content/posts/` does NOT contain `hello-world.mdx`, `seo-checklist.mdx`, or `why-not-wordpress.mdx`. **`npx shipwreck-blog-doctor` does NOT flag "Demo posts still in src/content/posts/".** Either the dir is empty (acceptable for a fresh integration with no posts yet) OR contains real site-specific content. Demo `jane.json` author has been removed or replaced.
-
-The engine demo ships with three example posts (`hello-world.mdx`, `seo-checklist.mdx`, `why-not-wordpress.mdx`) and a demo author (`jane.json`). These are scaffolding for the engine's own development — **they must not ship as the live blog content of any real site.**
-
-Two valid outcomes:
-
-1. **Empty the posts dir** (typical for new sites with no content yet):
-   ```bash
-   cd _blog/src/content/posts
-   rm hello-world.mdx seo-checklist.mdx why-not-wordpress.mdx
-   ```
-2. **Replace with at least one real post** — write or accept a draft from the user with site-specific content. See the [add-shipwreck-blog-post skill](add-shipwreck-blog-post.md) for the post-writing runbook.
-
-Also remove or replace demo author `_blog/src/content/authors/jane.json`. Real authors only.
-
-Verify: `npx shipwreck-blog-doctor` (default mode, no flags) returns no "Demo posts" or "Demo author" findings.
+Commit at this point: `git add -A && git commit -m "feat: scaffold blog at _blog/"`.
 
 ---
 
 ## Phase 2 — Extract host design tokens
 
-> **Precondition (must be true to start this phase):** Phase 1 done-check passed (engine packages resolve, doctor green on the package check).
+> **Precondition:** Phase 1 done.
 >
-> **Done-check (must be true before proceeding to the next phase):** `src/styles/tokens.css` exists. Every token listed in [TOKEN-CONTRACT.md](../../packages/blog-theme-default/TOKEN-CONTRACT.md) has a host-derived value (not an engine default). The file is imported from BaseLayout.astro. **If any token is still at engine default, the integration will look wrong.**
+> **Done-check:** `_blog/src/styles/tokens.css` exists. Every token from [TOKEN-CONTRACT.md](../../packages/blog-theme-default/TOKEN-CONTRACT.md) has a host-derived value. The file is imported in `_blog/src/layouts/BaseLayout.astro`. `_blog/src/styles/global.css` does **NOT** contain `@import "@shipwreck/blog-theme-default/tokens.css"` (that line silently overrides your work — see CHANGELOG 0.3.4).
 
+Extract the host's actual visual tokens. Order of preference:
 
-You're filling out [TOKEN-CONTRACT.md](../../packages/blog-theme-default/TOKEN-CONTRACT.md). The contract enumerates every theming token the engine exposes — your job is to fill each with a host-correct value.
-
-### 2a — Source the values
-
-Pick the highest-fidelity source available, in this order:
-
-1. **Host repo Tailwind config** — read `theme.extend.colors`, `fontFamily`, `borderRadius`. Best signal.
-2. **Host CSS custom properties** — grep for `:root` and `--color-*` / `--font-*` in any global CSS.
-3. **Host computed styles via browser** — if no repo access, run [extract-theme.mjs](../../scripts/extract-theme.mjs):
+1. **Host repo's CSS** — grep the host's stylesheets for `:root` / CSS custom properties / Tailwind config. Best signal.
+2. **Host repo's Tailwind config** — `theme.extend.colors`, `fontFamily`, `borderRadius`.
+3. **Live host computed styles** via [scripts/extract-theme.mjs](../../scripts/extract-theme.mjs):
    ```bash
-   node scripts/extract-theme.mjs https://<host-domain> > _blog/src/styles/tokens.draft.css
+   node <engine>/scripts/extract-theme.mjs https://<domain> > _blog/src/styles/tokens.draft.css
    ```
    Heuristics are best-effort; review every value before committing.
 
-### 2b — Write `_blog/src/styles/tokens.css`
-
-Use the [TOKEN-CONTRACT skeleton](../../packages/blog-theme-default/TOKEN-CONTRACT.md#where-to-write-the-values) as the template. Fill **every** token — leaving one at the engine default when the host has a different value is a visible mismatch.
-
-Ensure it loads in `_blog/src/layouts/BaseLayout.astro`:
-```astro
----
-import "../styles/tokens.css"
-import "../styles/global.css"
----
-```
-
-### 2c — Validate every token
-
-Run through the [Validation checklist](../../packages/blog-theme-default/TOKEN-CONTRACT.md#validation-checklist). Every item must be ✓.
+Fill `_blog/src/styles/tokens.css` using [TOKEN-CONTRACT.md](../../packages/blog-theme-default/TOKEN-CONTRACT.md) as the schema. Every token from the contract.
 
 ---
 
 ## Phase 3 — Port the SiteShell (header + footer)
 
-> **Precondition (must be true to start this phase):** Phase 2 done — `src/styles/tokens.css` exists with every contract token filled.
+> **Precondition:** Phase 2 done.
 >
-> **Done-check (must be true before proceeding to the next phase):** `src/components/SiteShell/Header.astro` contains the host's actual nav (NOT the engine placeholder). `src/components/SiteShell/Footer.astro` contains the host's actual footer (NOT the placeholder). Neither file contains the comment `Replace this with the host site's...`. **`npm run doctor` does NOT flag SiteShell as still placeholder — if it does, Phase 3 is not done.**
-
+> **Done-check:** `_blog/src/components/SiteShell/Header.astro` shows the host's actual nav. `_blog/src/components/SiteShell/Footer.astro` shows the host's actual footer. Neither file contains the comment `Replace this with the host site's...`. Doctor's default mode does NOT flag SiteShell as still placeholder.
 
 Copy the host's existing header/footer markup into:
 - `_blog/src/components/SiteShell/Header.astro`
 - `_blog/src/components/SiteShell/Footer.astro`
 
-**Conversion rules:**
-- React/Vue/Nuxt → Astro: `className` → `class`, no JSX expressions, no framework `<Link>` — use plain `<a>`
-- Drop client-only state (search bars, login buttons) unless the blog needs them
+Conversion rules:
+- React/Vue/Nuxt → Astro: `className` → `class`, no JSX expressions
+- Drop client-only state unless the blog needs it
 - Keep all nav menu items intact
 - Add a "Blog" link to the nav if not present
-- Preserve all utility classes verbatim — Phase 2 tokens make them resolve correctly
+- Preserve all utility classes verbatim
 
-If the host loads Google Fonts via `<link>` in `<head>`, port the same `<link>` into `_blog/src/layouts/BaseLayout.astro` `<head>`.
+If the host loads Google Fonts via `<link>`, port the same `<link>` into `_blog/src/layouts/BaseLayout.astro` `<head>`.
 
 ---
 
 ## Phase 4 — Custom CTAs (optional)
 
-> **Precondition (must be true to start this phase):** Phase 3 done — SiteShell components ported.
+> **Precondition:** Phase 3 done.
 >
-> **Done-check (must be true before proceeding to the next phase):** Either: the user wanted custom CTAs and they exist in `src/components/cta/` + are registered in `cta/registry.ts` + are referenced in `site.config.ts`; OR the user declined custom CTAs and `site.config.ts` `ctaBlocks.default` is set to a sensible default for the host (or removed if no CTA is needed). **Do not leave the demo-site default `"book-consult"` if the host isn't a consulting business.**
+> **Done-check:** Either: the user wanted custom CTAs and they're wired into `_blog/src/components/cta/registry.ts` and referenced from `site.config.ts`; OR the user declined and `site.config.ts` `ctaBlocks.default` is set to a host-appropriate default (NOT the demo's `"book-consult"`).
 
-
-If the host has a primary CTA the blog should reuse, create `_blog/src/components/cta/<CtaName>.astro` and register it in `site.config.ts`:
-
-```ts
-ctaBlocks: {
-  default: "<cta-name>",
-  categoryOverrides: {
-    "category-slug": "<other-cta-name>",
-  },
-}
-```
-
-Buttons read tokens (`--button-bg`, `--button-radius`, etc.), so they should match host visuals automatically once Phase 2 is done.
+If the host site has a primary CTA the blog should reuse, create `_blog/src/components/cta/<CtaName>.astro` and register it. Buttons read `--button-*` tokens, so they should match host styling automatically once Phase 2 is done.
 
 ---
 
 ## Phase 5 — Build & visual verification
 
-> **Precondition (must be true to start this phase):** Phases 1–4 all done.
+> **Precondition:** Phases 1–4 done.
 >
-> **Done-check (must be true before proceeding to the next phase):** `npm run build` succeeds with zero errors. `dist/` exists and contains an `_astro/*.css` file. `scripts/visual-diff.mjs` against the live host returns <5% diff per region. **`npm run doctor` from the per-site repo reports zero fatal issues** (warnings are acceptable but should be reviewed). If any check fails: STOP, fix, re-verify. Do not proceed to Phase 6 with a half-themed blog — once deployed it's harder to roll back.
-
+> **Done-check:** `cd _blog && npm run build` succeeds. `_blog/dist/` exists with HTML pages and CSS. Visual diff against host returns <5% per region. `npx shipwreck-blog-doctor` reports zero fatal issues.
 
 ```bash
 cd _blog
-npm install
 npm run build
-```
 
-Output goes to `_blog/dist/`. Then verify:
-
-```bash
-# Start preview server
+# Preview locally
 npx astro preview --host 0.0.0.0 --port 4322 &
 
-# Diff against host
-node scripts/visual-diff.mjs https://<host-domain>/ http://localhost:4322/blog/
+# Visual diff against the live host
+node <engine>/scripts/visual-diff.mjs https://<domain>/ http://localhost:4322/blog/
 ```
 
-Any region with >5% pixel diff fails. Fix tokens, rebuild, re-verify. Manual sanity check at minimum:
-
-- [ ] Header looks identical to host (logo, nav, spacing, colors)
+Manual sanity check:
+- [ ] Header looks identical to host
 - [ ] Footer looks identical
 - [ ] Inline link in a blog post matches host link color + hover
-- [ ] H1 font matches host H1 (family, weight, tracking)
-- [ ] Body text matches host body (family, size, line-height, color)
+- [ ] H1 font matches host H1
+- [ ] Body text matches host body
 - [ ] Primary CTA button matches host's most prominent CTA
-- [ ] Card border-radius matches host card style
 - [ ] No engine-default colors leaking through
 
-**Capture goldens** — once visual verification passes, capture screenshots of the live blog preview as the regression baseline:
-```bash
-mkdir -p .shipwreck/goldens/<site-name>/
-# (capture script TBD — for now, save manual screenshots of post page, index, tag page)
-```
+If any check fails: fix tokens, rebuild, re-verify. Do not proceed to Phase 6 with a half-themed blog.
 
 ---
 
-## Phase 6 — Deploy & enable self-update
+## Phase 6 — Deploy via the host's existing mechanism
 
-> **Precondition (must be true to start this phase):** Phase 5 done — doctor green, visual diff passed, `dist/` ready.
+> **Precondition:** Phase 5 done — doctor green, visual diff passed, `_blog/dist/` ready.
 >
-> **Done-check (must be true before proceeding to the next phase):** For Mode A: per-site repo pushed; CI built and published a release tarball; `shipwreck-updater.php` installed on host with cron registered; `curl https://<domain>/shipwreck-updater.php?token=…` reports `{"ok":true}` and `/blog/` renders the themed blog in the browser. For Mode B: `dist/` copied to `<host-checkout>/blog/`; local serve confirms `/blog/` renders correctly. For Mode C: build pushed via rsync/sftp; live `/blog/` URL renders.
+> **Done-check:** Built blog dist is at `<host-docroot>/blog/`. `https://<domain>/blog/` returns 200 and renders the themed blog. The host site's normal deploy mechanism was used.
 
+The blog is just static files. How they get to the host is whatever the host already does:
 
-Commit and push the **per-site blog repo** (NOT the host site repo — see "Critical model concept" at the top). The included GH Action will build automatically on push and create a `blog-dist.tar.gz` release.
+| Host setup | Blog deploy step |
+|---|---|
+| Repo auto-deploys to Cloudflare Pages / Netlify / Vercel / GitHub Pages | Copy `_blog/dist/` → `<repo-root>/blog/`, commit, push. Auto-deploy publishes both. |
+| VPS with SSH (Prem3/Prem4 etc.) | `rsync -avz --delete _blog/dist/ user@host:/home/<domain>/public_html/blog/` (or use `scripts/deploy-blog.mjs`) |
+| Cheap shared cPanel without SSH | SFTP `_blog/dist/` to `/public_html/blog/`, or zip + cPanel File Manager upload |
+| Custom Docker / CI pipeline | Add a step that copies `_blog/dist/` to the same place the host's static files go |
 
-```bash
-cd ~/projects/<site-name>-blog
-git add -A
-git commit -m "feat: initial blog scaffold for <site-name>"
-git push -u origin main
-```
+**Pre-deploy checks (when the host has a webserver layer):**
 
-Wait for the GH Action to complete (~2 min). Verify a release was published on the per-site repo's GitHub Releases page with the tarball asset.
-
-### Pre-host-side setup (do these BEFORE running the installer)
-
-These prevent the very common "first update succeeds but `/blog/` returns 404 or a WordPress page" failure mode:
-
-1. **Pre-create the install directory** (some cheap cPanel hosts won't let the updater `mkdir` arbitrary paths the first time):
-   ```bash
-   ssh user@<server>
-   mkdir -p /home/<domain>/public_html/blog
+1. **`.htaccess` doesn't intercept `/blog/*`.** If the host serves WordPress (or any framework) at the apex, add **above** any framework rules:
+   ```apacheconf
+   RewriteRule ^blog/ - [L]
    ```
+   Test with `curl -I https://<domain>/blog/` — should return 200.
 
-2. **If the host's webserver intercepts `/blog/*`, add an early skip.** Any host running an apex CMS (WordPress, Drupal, Ghost, etc.) likely has a rewrite rule that catches every path. The blog is a static directory — let the webserver serve it directly.
+2. **CDN cache rule for `/blog/*`** (if there's a CDN). Aggressive edge-caching is safe; the next deploy will overwrite. Configure in CDN dashboard.
 
-   - **Apache / OpenLiteSpeed (`.htaccess`):** add **above** any framework rules:
-     ```apacheconf
-     # Static blog mount — let Apache serve files directly
-     RewriteRule ^blog/ - [L]
-     ```
-   - **nginx:** add a `location /blog/ { try_files $uri $uri/ =404; }` block before the catch-all that proxies to the framework
-   - **Cloudflare Pages / Netlify / Vercel / static hosts:** no action needed — they serve subpaths directly.
-
-   Test with `curl -I https://<domain>/blog/` — should return `200` (not the framework's 404) once the install path has any file in it.
-
-3. **CDN cache rule for `/blog/*` (optional, recommended if there's a CDN).** The blog is fully static; aggressive edge-caching is safe. The updater purges cache after each successful update via the configured CDN API.
-
-   - **Cloudflare:** Cache Rule, phase `http_request_cache_settings`, when `(http.request.uri.path matches "^/blog/")`, action `cache_level=cache_everything`, `edge_ttl=86400`.
-   - **Other CDNs (Fastly, BunnyCDN, AWS CloudFront, etc.):** equivalent rule — match path prefix, allow long edge TTL.
-   - **No CDN:** skip.
-
-### Run the one-shot installer
-
-The installer runs ON THE HOST. Use whichever shell access is available:
-
-- SSH (most VPS, Prem-style boxes, dedicated hosts): standard
-- cPanel "Terminal" feature (most cPanel tiers in the last few years): same effect
-- WHM root shell (if you're an admin): same
-- Shell-less cPanel: run `install-updater.sh` from a local machine, then SFTP `shipwreck-updater.php` + `.shipwreck-updater.config.php` into place yourself, and add the cron via the cPanel "Cron Jobs" UI.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/1tronic/shipwreck-blog-engine/main/scripts/install-updater.sh | bash -s -- \
-  --release-repo <git-org>/<site-name>-blog \
-  --install-path /home/<domain>/public_html/blog \
-  --domain <domain> \
-  --cloudflare-zone-id <ZONE_ID> \
-  --cloudflare-token <CF_API_TOKEN>
-```
-
-The `--cloudflare-*` flags are optional. Omit them if the host doesn't sit behind Cloudflare; the updater still works, it just skips cache purging.
-
-The installer:
-1. Downloads `shipwreck-updater.php` to the host's `public_html/`
-2. Generates a 32-char random token and writes the config to `~/.shipwreck-updater.config.php` (above public_html, never web-served)
-3. Picks a random update minute (0–59) + random hour (23/00/01/02) so this site doesn't poll GitHub at the same minute as every other site
-4. Adds the cron line (with `-m 60` curl timeout — sufficient for tarball download; don't drop below `30`)
-5. Prints the resulting status URL + manual-trigger URL
-
-**Trigger the first update manually** to seed `/blog/`:
-```bash
-curl "https://<domain>/shipwreck-updater.php?token=<TOKEN_FROM_INSTALLER_OUTPUT>"
-# expect: {"ok":true,"updated":true,"from":null,"to":"<engine-version>"}
-```
-
-Verify in the browser: `https://<domain>/blog/` should now render. If it 404s, recheck the `.htaccess` rewrite skip from step 2 above.
+After deploy, browse `https://<domain>/blog/` and `https://<domain>/blog/<a-post-slug>/` to confirm rendering matches local preview.
 
 ---
 
 ## Phase 7 — Wire the blog into the host site
 
-> **Precondition (must be true to start this phase):** Phase 6 done — blog reachable at `/blog/` and renders with host theme.
+> **Precondition:** Phase 6 done — blog reachable and rendering.
 >
-> **Done-check (must be true before proceeding to the next phase):** Footer link to `/blog/` added to the host site's footer (test by loading host homepage, scroll to footer, click — `/blog/` loads). Nav link decision applied: either added to host nav (if user wanted) or explicitly skipped. `robots.txt` on host has `Sitemap: https://<domain>/blog/sitemap-index.xml`. **The blog must be discoverable from the host site — without these wirings it's invisible.**
+> **Done-check:** Footer link to `/blog/` added to the host's footer. Nav link decision applied. `robots.txt` lists `/blog/sitemap-index.xml`. The blog is **discoverable** from the host homepage.
 
-
-This is the step that makes the blog **discoverable**. Without it, the blog is technically live but invisible — no link from anywhere on the host site to `/blog/`.
-
-You're editing the **host site repo** (NOT the per-site blog repo). These are the only host-repo edits the integration should ever make:
+This is the step that makes the blog visible. Without it, the blog is technically live but invisible.
 
 ### 7a — Footer link (required)
 
-Open the host site's footer file/component (the user told you where in the inputs phase). Add a "Blog" link near other footer nav links (Privacy, Terms, etc.). Use the host's existing footer link styling — copy the surrounding markup pattern. Example for a static HTML host:
+Add a "Blog" link to the host's footer in the host's existing footer styling. Test by loading host homepage, scroll to footer, click → `/blog/` loads.
 
-```html
-... &middot; <a href="/blog/" class="footer-link">Blog</a> &middot; ...
-```
+### 7b — Main nav link (ASK the user — they decide)
 
-For a React/Vue/Astro host, follow the host's component patterns. Don't add new styles — match what's there.
+> "Want to add 'Blog' to the main nav as well, or footer-only?"
 
-**Verify:** load the host homepage in a browser, scroll to footer, see "Blog" link, click it → `/blog/` loads correctly.
+If yes: add to host's nav file/component in the existing nav-item style. Verify in browser.
 
-### 7b — Main nav link (ask the user)
+### 7c — `robots.txt` reference
 
-Some sites want "Blog" in the main nav, some prefer footer-only. Ask:
-
-> "Want to add a 'Blog' link to the main nav on the homepage as well? Some sites prefer footer-only to keep the nav clean."
-
-If yes: open the host's nav file/component, add the link in the host's existing nav-item style. Place it sensibly — usually after content nav items, before any login/CTA buttons. Verify in browser.
-
-### 7c — `robots.txt` reference to blog sitemap (recommended)
-
-The blog auto-generates `/blog/sitemap-index.xml` listing every post. Add it to the host's `robots.txt` so search engines find it:
-
+Add to host's `robots.txt`:
 ```
 Sitemap: https://<domain>/blog/sitemap-index.xml
 ```
 
-(Place at the bottom of `robots.txt` alongside any existing `Sitemap:` lines.)
-
-### 7d — Skip these unless the user asks
-
-These are NOT default integration tasks — only do them if Phase 9 questions trigger them:
-
-- Latest-3-posts callout on the homepage (requires fetching `/blog/posts.json` at host build time)
-- RSS link in footer pointing at `/blog/rss.xml`
-- Cross-linking individual blog posts from other host pages
-
 ---
 
-## Phase 8 — Register & monitor
+## Phase 8 — Register & track
 
-> **Precondition (must be true to start this phase):** Phase 7 done — host wiring complete.
+> **Precondition:** Phase 7 done.
 >
-> **Done-check (must be true before proceeding to the next phase):** `.shipwreck/sites.json` in the engine repo has this site's entry with `engineVersion`, `domain`, `deploy.method`, `source.repo`, `cdn.*` filled. Uptime monitor created on the user's monitoring system (or explicitly skipped per the user's instruction). Topic note in the user's vault (or equivalent) updated with engine version + integration date + any quirks.
+> **Done-check:** `.shipwreck/sites.json` in the engine repo has this site's entry. `.shipwreck-site.json` in the site repo (created Phase 0) has `engineVersion` and `lastDeployed` filled in.
 
+Append to `<engine-repo>/.shipwreck/sites.json`:
+```json
+{
+  "name": "<site-name>",
+  "domain": "<domain>",
+  "blogPath": "/blog",
+  "blogSourcePath": "<absolute-path-to-_blog>",
+  "engineVersion": "0.3.5",
+  "lastDeployed": "<ISO-8601-timestamp>",
+  "owner": "<who-maintains>",
+  "notes": "<integration date, deploy mechanism, quirks>"
+}
+```
 
-1. **Add to site registry.** Edit `<engine-repo>/.shipwreck/sites.json`, append the new site entry. Set `engineVersion` to the version that's installed (read from `https://<domain>/shipwreck-updater.php?token=…&action=status`). Commit + push the engine repo.
+Update `<site-repo>/.shipwreck-site.json` with `engineVersion` and `lastDeployed`.
 
-2. **Add an Uptime Kuma monitor** for the status endpoint:
-   - URL: `https://<domain>/shipwreck-updater.php?token=<TOKEN>&action=status`
-   - Type: HTTP keyword
-   - Keyword: `"is_current":true`
-   - If the keyword goes missing for >7 days, the site has fallen behind on updates — alert.
-
-3. **Update `D:/NyXi's Vault/Topics/<SiteName>.md`** with:
-   - Engine version installed
-   - Theme integration date
-   - Custom CTAs added
-   - Per-site quirks (host-specific fonts, dark-mode, .htaccess gotchas)
-   - Reference to the per-site blog repo
+Optional: add an uptime monitor for `/blog/` (HTTP 200 keyword check) on whatever monitoring system you use.
 
 ---
 
-## Phase 9 — Post-install integration questions (MANDATORY — actually execute, not "consider")
+## Phase 9 — Post-install integration questions (MANDATORY — actually execute)
 
-> **Precondition (must be true to start this phase):** Phase 8 done — site registered + monitored.
+> **Precondition:** Phase 8 done.
 >
-> **Done-check (must be true before declaring the integration complete):** Every question in the list below has been **asked of the user in this session** (not just acknowledged in your head, not just listed in a status report — actually presented as questions to the user, with their answers acted on or logged). Then `npx shipwreck-blog-doctor --final --phase9-confirmed --feedback-status=<provided|none-needed>` returns 0 fatal issues.
+> **Done-check:** Every question below has been **asked of the user in this session** (interactive output — not listed in a status report). Then `npx shipwreck-blog-doctor --final --phase9-confirmed --feedback-status=<provided|none-needed>` returns 0 fatal.
 >
-> **⚠️ This phase is the most-skipped phase by agents because it requires interactive output rather than file work.** Do not rationalise it as "optional" or "for later" or "the user can ask if they want." The integration skill explicitly requires you to present these questions to the user. If you finish without asking, you have not completed the integration — you have done a partial install and lied about it being done. Doctor's `--final` mode enforces this with the `--phase9-confirmed` flag: only pass that flag AFTER you've actually asked.
+> **⚠️ Most-skipped phase by agents.** Do not rationalise as "optional" or "for later" or "the user can ask if they want." Present each as a question. Get answers. Act on each.
 
-After verifying the blog is live and themed correctly, **ask the user the questions below**. Don't assume answers. Don't skip on the user's behalf. Don't list them in your status message instead of asking. Present them as questions, get answers, act on each one:
+Ask the user:
 
-1. **"Want a 'Latest 3 posts' callout on the homepage?"**
-   The blog publishes `/blog/posts.json` listing every post. We can wire a small fetch into the host's homepage build that pulls the most recent 3 and renders them as cards. If yes, ask where on the homepage they should appear.
+1. **"Want a 'Latest 3 posts' callout on the homepage?"** — fetches `/blog/posts.json` at host build time. If yes, where on the homepage?
+2. **"Want an RSS feed link in the footer pointing to `/blog/rss.xml`?"** — helps RSS readers + AI crawlers find it.
+3. **"Should I submit `https://<domain>/blog/sitemap-index.xml` to Google Search Console?"** — and Bing Webmaster?
+4. **"Are there specific host pages that should cross-link to specific blog posts?"** — get a list, edit the host's pages or note for later.
+5. **"Want to enable Sveltia CMS at `/blog/admin/` for non-dev editing?"** — already pre-wired; needs `_blog/public/admin/config.yml` filled with the site repo + GitHub OAuth setup. See `INTEGRATION.md` Part 4.
 
-2. **"Want an RSS feed link in the footer pointing to `/blog/rss.xml`?"**
-   The blog auto-generates RSS. Adding a discoverable link helps RSS readers + some AI crawlers find it.
-
-3. **"Should I submit `https://<domain>/blog/sitemap-index.xml` to Google Search Console?"**
-   If the user has the GSC property already verified, you can do this through GSC API or just give them the URL to add manually. Same for Bing Webmaster Tools.
-
-4. **"Are there specific host pages that should cross-link to specific blog posts?"**
-   E.g., for a local-news site the location/category pages might reference relevant blog posts ("See our guide on X"); for an e-commerce site product pages might reference how-to articles. Get a list from the user, then either edit the host repo or note for later.
-
-5. **"Want me to set up a content-writer onboarding doc for whoever writes posts going forward?"**
-   Points them at the `add-shipwreck-blog-post` skill (for agents) or the Sveltia CMS at `/blog/admin/` (for humans).
-
-6. **"Any host pages that mention 'articles', 'guides', or 'news' but don't link to the blog yet?"**
-   Quick grep through the host repo — `grep -ri "articles\|guides\|news" --include='*.html' --include='*.astro'` — surfaces missed link opportunities.
-
-7. **"Want to enable Sveltia CMS at `/blog/admin/` for non-dev editing?"**
-   Already pre-wired in the engine. Just needs the user to fill in `_blog/public/admin/config.yml` with their GitHub repo + branch + register a GitHub OAuth app. See `INTEGRATION.md` Part 4 for steps.
-
-For each "yes", do the work and verify. For each "no" or "later", log it in the site's vault topic note as a deferred follow-up.
+For each yes: do the work and verify. For each no/later: log it in `<site-repo>/.shipwreck-site.json` `notes` field as a deferred follow-up.
 
 ---
 
-## Common failure modes
-
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| ToC duplicated at desktop width | `@shipwreck/blog-theme-default < 0.2.0` (Tailwind not scanning engine components) | Ensure `npm update` pulled `^0.2.0` of both engine packages |
-| Giant brand banner above article | Old `defaultFeaturedImage` hero fallback | Upgrade `@shipwreck/blog-core >= 0.2.0`; thin wrappers in `>= 0.3.0` no longer have this risk |
-| Two H1s on every post | MDX starts with same H1 as frontmatter title | The `shipwreckBlog()` integration auto-strips it from `>= 0.3.0`. If still seeing it, confirm `astro.config.ts` uses the integration. |
-| Buttons don't match host | `--button-*` tokens not set in tokens.css | Sample host's primary CTA in browser devtools, copy values |
-| Blog body looks "almost" right but slightly off | One or more tokens at engine default | Re-run [Validation checklist](../../packages/blog-theme-default/TOKEN-CONTRACT.md#validation-checklist) |
-| Updater says `github_unreachable` | Outbound HTTPS blocked on the host | Most cPanel hosts allow it. If blocked, contact host or use Path B (SSH push) |
-| Updater says `sha256_mismatch` | Tarball corrupted or release notes don't include the SHA line | Check the per-site repo's GH Action output. The build workflow writes the SHA into the release body automatically — if it's missing, the workflow file may be out of date |
-| `403 Forbidden` from updater URL | Wrong token | Read it from `~/.shipwreck-updater.config.php` |
-| First `/blog/` request returns 404 or WordPress page | Host `.htaccess` is rewriting `/blog/*` to the framework before Apache serves the static file | Add `RewriteRule ^blog/ - [L]` ABOVE existing rewrite rules in `.htaccess` (Phase 6 pre-step) |
-| Updater can't `mkdir` the install path on first run | cPanel restricts `mkdir` from PHP for some paths | Pre-create the install directory via shell/SFTP (Phase 6 pre-step) |
-| Blog deployed but unreachable from the host site | Forgot Phase 7 — no footer/nav link added | Add the footer link (Phase 7a, required); ask about main nav (7b) |
-| Engine version drift across sites (some on 0.2.0, others on 0.3.0) | Per-site GH Action didn't run on engine release | Check that `SHIPWRECK_DISPATCH_PAT` secret is set on the engine repo with `repo` scope; manually trigger via `gh workflow run release-dispatch.yml -f version=0.3.0` |
-
----
-
-## After integration succeeds
-
-The site is now fully self-updating. Future engine releases auto-propagate through:
-
-1. Engine repo tags `vX.Y.Z`
-2. Engine GH Action `release-dispatch.yml` fires `repository_dispatch` to every registered site repo
-3. Per-site repo's `blog-build.yml` runs, builds with new engine, publishes new release
-4. Host's daily cron picks up the release within 24h, atomically swaps to new version
-5. Cloudflare cache purged automatically
-
-**Nothing else for us to do per release** unless something breaks. If something breaks: visual-diff in the GH Action will catch it (TODO: wire that in), uptime monitors will catch the keyword regression, or someone notices.
-
----
-
-## 🛑 Before you report "done" to the user — final blocking checkpoint
-
-The doctor's `--final` mode is the single command that gates "you may report this as done."
+## 🛑 Final blocking checkpoint — single command gate
 
 ```bash
+cd <site-repo>/_blog
 npx shipwreck-blog-doctor --final \
   --phase9-confirmed \
   --feedback-status=provided     # if you wrote a FEEDBACK-FOR-CLAUDE-<job>.md
   # OR --feedback-status=none-needed  # if explicitly nothing to feed back this run
 ```
 
-**If this command does not return exit 0 with all checks passing, the integration is not done.** Period. Do not report done. Go back and fix the failures.
+**This is the ONLY gate for declaring done.** Don't pass `--phase9-confirmed` if you skipped Phase 9. Don't pass `--feedback-status=none-needed` unless you genuinely have nothing to feed back.
 
-The `--phase9-confirmed` flag is a self-attestation: by passing it, you are stating that you have asked the user every Phase 9 question in this session, in actual interactive output. **If you skipped Phase 9, do not pass this flag — fix Phase 9 first.**
-
-The `--feedback-status` flag is required:
-- `--feedback-status=provided` — you wrote a `FEEDBACK-FOR-CLAUDE-<job-name>.md` file at the engine repo root with anything that should improve the engine for future integrations
-- `--feedback-status=none-needed` — you explicitly considered whether anything in the engine/skill could be improved based on this run AND determined nothing useful would come from a feedback note. Be honest. Most real integrations have at least one rough edge worth feeding back.
-
-Once `--final` returns 0 fatal, your status message to the user MUST include this audit trail block:
+When `--final` returns 0 fatal, your status message to the user MUST include:
 
 ```
 Integration done. Verifications:
 - shipwreck-blog-doctor --final: ✓ all checks passed
 - Live URL: https://<domain>/blog/ rendering correctly + visually matches host
-- Registry: .shipwreck/sites.json updated
-- Phase 9 questions: asked all 7; answers — [summarise]
+- Site repo: <repo-url-or-path>
+- Engine version: 0.3.5
+- Phase 9 questions: asked all 5; answers — [summarise]
 - Engine feedback: [link to FEEDBACK doc OR "no feedback needed: [reason]"]
-- Stack quirks: [link to stack-notes log OR "no new quirks observed"]
 ```
-
-That status message is the user's audit trail. Skipping it (or fudging entries) is the same as lying about the integration being done. The user WILL run `--final` themselves to verify — save them the round-trip and do it honestly.
 
 ### Failure modes to watch for in your own behaviour
 
-These are what previous agents (Nyxi, included) have done that produced broken integrations. If you catch yourself doing any of these, stop:
+If you catch yourself doing any of these, stop:
 
-- **"Optional questions I'll mention but not ask"** — Phase 9 questions are not optional. Ask them, in this session, as actual prompts to the user.
-- **"Doctor passed so I'm done"** — doctor's default mode passes Phase 1-3 checks; `--final` is the gate. Use `--final`.
-- **"It builds and serves so it's working"** — see the wollongong-weather first integration, where it built+served but the cascade-order bug meant the dark theme was overridden by engine defaults. Working ≠ integrated.
-- **"I'll write feedback if I think of something"** — write feedback now or pass `--feedback-status=none-needed` with an honest reason. The "I'll think about it later" path leads to the engine never improving.
+- **"I'll just use the demo posts — they look fine"** — they're labelled as engine boilerplate. Real sites have real content (or empty posts dir).
+- **"Optional questions I'll mention but not ask"** — Phase 9 is not optional. Ask them in this session, as actual prompts.
+- **"Doctor passed so I'm done"** — doctor's default is the gate for Phases 1-8; `--final` is the gate for "done." Use `--final`.
+- **"It builds and serves so it's working"** — see CHANGELOG 0.3.4: previous integration built and served but the cascade-order bug meant the dark theme was overridden by engine defaults. Working ≠ integrated.
+- **"I'll write feedback if I think of something"** — write feedback now or pass `--feedback-status=none-needed` with an honest reason.
+- **"Let me create a separate blog repo for this site"** — STOP. The blog goes inside the site repo. Re-read the "Critical model concept" at the top of this skill.
+
+---
+
+## Common failure modes (reference table)
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Engine package symlinks broken | Wrong number of `../` in `file:` dep spec | Fix `file:` path in `_blog/package.json`, `npm install` again |
+| Tailwind classes missing in built CSS | Tailwind preset not finding engine `pages/` | v0.3.2+ should handle this. If not, check `tailwind.config.ts` uses `require.resolve` to find the engine path |
+| Dark theme renders light (or any cascade weirdness) | `_blog/src/styles/global.css` `@import`s engine tokens.css | Remove that `@import` line — consumer's `tokens.css` is the only source |
+| Two H1s on every post | MDX starts with same H1 as frontmatter title | `shipwreckBlog()` integration auto-strips. Confirm `astro.config.ts` registers it |
+| Doctor flags demo content | Phase 1 cleanup skipped | Remove `hello-world.mdx`, `seo-checklist.mdx`, `why-not-wordpress.mdx` from `_blog/src/content/posts/` |
+| `--final` blocks completion | Missing `--phase9-confirmed` and/or `--feedback-status=...` | Complete Phase 9, write feedback OR declare none-needed, pass the flags |
+| First `/blog/` request returns 404 or WordPress page | Host `.htaccess` rewrites `/blog/*` to framework | Add `RewriteRule ^blog/ - [L]` above framework rules |
+
+---
+
+## After integration succeeds
+
+The site is on the engine. Future engine releases propagate by:
+
+1. Engine ships a new version (CHANGELOG entry)
+2. Per site: bump `@shipwreck/blog-core` and `@shipwreck/blog-theme-default` versions in `_blog/package.json`
+3. `cd _blog && npm install && npm run build`
+4. Deploy via the same mechanism Phase 6 used (commit + push, rsync, SFTP, etc.)
+5. `npx shipwreck-blog-doctor --final --phase9-confirmed --feedback-status=none-needed` to verify
+
+No central infrastructure. No daily polling. No tokens. No cron. The host site's existing deploy pipeline does the work.

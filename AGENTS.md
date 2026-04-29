@@ -16,7 +16,7 @@ This file is the canonical entry point for any agent (Claude/Codex/Nyxi/OpenClaw
 2. **READ THIS FILE COMPLETELY** before opening any other file.
 3. **Identify your job from the table below**, then follow ONLY the runbook it points to, phase-by-phase, in order.
 4. **DO NOT skip phases** in the runbook. Each phase has a precondition (must be true to start) and a done-check (must be true to finish). If a precondition fails, return to the previous phase. If a done-check fails, the phase is not done.
-5. **DO NOT declare "done" until** you have run `npm run doctor` (provided by `@shipwreck/blog-core`) AND it reports zero fatal issues, AND you have completed the end-of-job protocol below.
+5. **DO NOT declare "done" until** you have run `npx shipwreck-blog-doctor --final --phase9-confirmed --feedback-status=<provided|none-needed>` AND it reports zero fatal issues. Default `npm run doctor` is the gate for Phases 1-8; `--final` is the gate for "integration complete."
 
 If you skip any of the above, you will produce a half-broken integration that we will have to throw away and redo. We've been there. Don't repeat it.
 
@@ -29,9 +29,8 @@ If you skip any of the above, you will produce a half-broken integration that we
 | Install the blog engine on a site (any site, any host, any stack) | [.claude/skills/integrate-shipwreck-blog.md](.claude/skills/integrate-shipwreck-blog.md) |
 | Add, write, or publish a blog post on a site that already has the engine | [.claude/skills/add-shipwreck-blog-post.md](.claude/skills/add-shipwreck-blog-post.md) |
 | Theme an already-installed blog (change colours/fonts/buttons to match a host) | [packages/blog-theme-default/TOKEN-CONTRACT.md](packages/blog-theme-default/TOKEN-CONTRACT.md) — fill every token, then rebuild |
-| Push a fresh build of an existing site's blog (when we have SSH) | [scripts/deploy-blog.mjs](scripts/deploy-blog.mjs) — `node scripts/deploy-blog.mjs --site <name>` |
-| Install the universal self-updater on a host (one-time, per site) | [scripts/install-updater.sh](scripts/install-updater.sh) |
-| Diagnose why a recently-integrated site looks broken | Run `npm run doctor` first. Then [.claude/skills/integrate-shipwreck-blog.md](.claude/skills/integrate-shipwreck-blog.md) → "Common failure modes" table |
+| Push a fresh build of an existing site's blog (when we have SSH) | [scripts/deploy-blog.mjs](scripts/deploy-blog.mjs) — convenience helper, not load-bearing |
+| Diagnose why a recently-integrated site looks broken | Run `npx shipwreck-blog-doctor` first. Then [.claude/skills/integrate-shipwreck-blog.md](.claude/skills/integrate-shipwreck-blog.md) → "Common failure modes" table |
 | Understand how the engine propagates updates to all sites | [ROLLOUT.md](ROLLOUT.md) |
 | Fix a bug or ship a feature in the engine itself | [CONTRIBUTING.md](CONTRIBUTING.md) + [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Anything not on this list | STOP. Ask the user to clarify before improvising. |

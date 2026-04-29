@@ -2,7 +2,7 @@
 
 A drop-in, SEO-first, hosting-agnostic static blog engine. Built on Astro + MDX. Designed to install onto **any** static-file-serving host: cheap shared cPanel, OpenLiteSpeed/CyberPanel, dedicated VPS, Cloudflare Pages, Netlify, Vercel, S3+CloudFront, raw nginx — anything.
 
-**Goal:** add a blog to any site, theme it to look native to that site, and ship static SEO-optimised HTML — without WordPress, without lock-in to a specific host or CDN.
+**Goal:** add a blog to any site, theme it to look native to that site, and ship static SEO-optimised HTML — without WordPress, without lock-in to a specific host or CDN, and without a separate "blog repo" per site (the blog lives inside the host site's repo).
 
 ---
 
