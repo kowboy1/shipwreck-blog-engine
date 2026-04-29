@@ -145,9 +145,9 @@ docs/
 
 #### One-off / historical (not for general reading)
 
-- `HANDOVER-NYXI.md` — handover note for the first end-to-end integration test
-- `HANDOFF-NYXI-REBUILD-WOLLONGONG-031.md` — one-off rebuild note
-- `FEEDBACK-FOR-CLAUDE-*.md` — feedback logs from real integrations (input for engine improvements)
+- `FEEDBACK-FOR-CLAUDE-*.md` — feedback logs from real integrations (input for engine improvements). Contains the why behind specific past releases. Don't read these as a general reference; only consult when investigating "why did v0.X.Y change Z?"
+
+Per-job handover notes (e.g. one-shot briefs for a specific integration) get deleted once the job is done — keeping stale ones around adds noise. Lessons graduate into CHANGELOG entries, stack-notes files, or the universal skill.
 
 ### Status
 

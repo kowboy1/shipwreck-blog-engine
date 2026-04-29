@@ -59,7 +59,7 @@ When in doubt:
 
 Stack-specific quirks discovered during real integrations belong in `.claude/skills/stack-notes/<stack>.md`, never in the universal docs. See `.claude/skills/stack-notes/README.md` for the convention.
 
-One-off handover docs (e.g. `HANDOVER-NYXI.md`, `HANDOFF-NYXI-REBUILD-WOLLONGONG-031.md`) ARE allowed to be specific — they describe one specific job, not the universal procedure. Keep them out of the index of "files agents should read for general context".
+One-off handover docs (briefs for a specific job) ARE allowed to be specific — they describe one specific job, not the universal procedure. Keep them out of the index of "files agents should read for general context", and **delete them once the job is done** so stale ones don't accumulate. Lessons learned during the job graduate into CHANGELOG entries, `.claude/skills/stack-notes/<stack>.md` files, or the universal skill itself.
 
 ## When adding something to the engine, ask yourself
 
