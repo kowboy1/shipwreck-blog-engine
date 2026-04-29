@@ -71,6 +71,7 @@ One-off handover docs (briefs for a specific job) ARE allowed to be specific —
 2. Does this require a new theming knob? → Add it to `TOKEN-CONTRACT.md` first (with a how-to-find-it-on-the-host recipe), then to `tokens.css`, then to the Tailwind preset.
 3. Does this add a new file the integration agent must read? → Update the index in [README.md](README.md). The README is the single source of truth for "what every file in this repo is for".
 4. Does this need to propagate to existing sites? → Make sure the change lives inside the package (not in per-site templates). Consumer sites should only need `npm update + rebuild`, not template patches.
+5. Does this change something that affects how the engine works at a conceptual level (build flow, deploy mechanism, what runs where, trade-offs)? → Update [HOW-IT-WORKS.md](HOW-IT-WORKS.md) and bump the "_Last reviewed for engine version_" note at the top. That doc is for humans understanding the project end-to-end and must stay accurate as the architecture evolves.
 
 ## Testing changes
 

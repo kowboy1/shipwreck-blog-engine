@@ -49,8 +49,9 @@ docs/                    # architecture, content model, ops, theming reference
 ### Documentation
 
 - **[AGENTS.md](AGENTS.md)** — agent entrypoint (read this if you're an AI agent of any kind)
-- [ARCHITECTURE.md](ARCHITECTURE.md) — engine internals
-- [ROLLOUT.md](ROLLOUT.md) — how engine updates propagate to every site (pull + push paths)
+- **[HOW-IT-WORKS.md](HOW-IT-WORKS.md)** — plain-English explainer for humans (what it does, why it's lighter than WordPress, what trade-offs you accept)
+- [ARCHITECTURE.md](ARCHITECTURE.md) — engine internals (technical)
+- [ROLLOUT.md](ROLLOUT.md) — how engine updates propagate to every site
 - [INTEGRATION.md](INTEGRATION.md) — high-level integration overview (the agent skill is the canonical step-by-step runbook)
 - [CONTRIBUTING.md](CONTRIBUTING.md) — fixing bugs, adding features in the engine
 - [CHANGELOG.md](CHANGELOG.md) — release history
