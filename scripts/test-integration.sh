@@ -219,6 +219,28 @@ else
   fail "Admin config missing logo_url"
 fi
 
+# Cascade-order regression check: consumer's global.css must NOT @import the
+# engine's tokens.css. Importing it cascades engine defaults over consumer
+# values and breaks Phase 2 work silently. This bit wollongong-weather's
+# first integration — never let it back in.
+GLOBAL_CSS="$TEST_SITE/src/styles/global.css"
+if grep -q '@import.*@shipwreck/blog-theme-default/tokens\.css' "$GLOBAL_CSS"; then
+  fail "global.css imports engine tokens.css (cascade-order bug — would override consumer values)"
+else
+  ok "global.css does not import engine tokens.css (cascade order correct)"
+fi
+
+# In the compiled CSS, there should be exactly ONE :root declaration with
+# --color-bg (the consumer's value wins). Two :root declarations means the
+# engine's tokens.css ALSO leaked into the output and the cascade is wrong.
+COLOR_BG_COUNT=$( { grep -oE -- '--color-bg: *[^;]+' "$CSS_FILE" 2>/dev/null || true; } | wc -l)
+if [[ "$COLOR_BG_COUNT" -le 1 ]]; then
+  ok "Compiled CSS has at most one --color-bg declaration (no cascade-order leak)"
+else
+  fail "Compiled CSS has $COLOR_BG_COUNT --color-bg declarations — engine defaults are cascading over consumer values"
+  grep -oE -- '--color-bg: *[^;]+' "$CSS_FILE"
+fi
+
 # ---------- 7. final doctor (full, with build check) ----------
 
 # Re-run doctor with build enabled. Scaffold's site.config still has
@@ -244,6 +266,31 @@ if echo "$DOCTOR_OUT" | grep -q "SiteShell/Header.astro is still the engine plac
   ok "Doctor correctly flags placeholder SiteShell (Phase 3 marker)"
 else
   fail "Doctor failed to flag placeholder SiteShell — Phase 3 detection broken"
+fi
+
+if echo "$DOCTOR_OUT" | grep -q "Demo posts still in src/content/posts/"; then
+  ok "Doctor correctly flags demo content (Phase 1.5 marker)"
+else
+  fail "Doctor failed to flag demo content — Phase 1.5 detection broken"
+fi
+
+if echo "$DOCTOR_OUT" | grep -q "global.css cascade order is correct"; then
+  ok "Doctor confirms global.css cascade order (no engine tokens override)"
+else
+  fail "Doctor failed to confirm cascade order — check the heuristic"
+fi
+
+# --final gate must require Phase 9 + feedback flags
+FINAL_OUT=$(npm run doctor -- --final --skip-build 2>&1 || true)
+if echo "$FINAL_OUT" | grep -q "Phase 9 questions not confirmed"; then
+  ok "Doctor --final correctly blocks completion without --phase9-confirmed"
+else
+  fail "Doctor --final did NOT enforce --phase9-confirmed flag"
+fi
+if echo "$FINAL_OUT" | grep -q "Feedback status not declared"; then
+  ok "Doctor --final correctly blocks completion without --feedback-status"
+else
+  fail "Doctor --final did NOT enforce --feedback-status flag"
 fi
 
 # ---------- summary ----------

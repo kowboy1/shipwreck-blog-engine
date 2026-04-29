@@ -8,6 +8,51 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-04-29
+
+Closes the gap between "skill says do X" and "agent actually does X." Triggered by Nyxi's third integration attempt — she did Phases 1–3 correctly but skipped Phase 1.5 (demo content cleanup), Phase 9 (post-install questions), and the feedback-protocol step despite the skill describing all three. Plus uncovered a critical cascade-order bug that silently overrode all her Phase 2 work.
+
+### Critical fix: cascade-order bug
+
+Demo-site `src/styles/global.css` had `@import "@shipwreck/blog-theme-default/tokens.css"` at the top. Result: in the bundled CSS, the engine's tokens.css ended up AFTER the consumer's `tokens.css` — engine's white/light defaults cascaded OVER the consumer's host-extracted values. Nyxi's Wollongong Weather integration had a perfectly correct dark-theme `tokens.css` but rendered light because of this bug.
+
+Fixed by removing the engine `@import` from demo-site's `global.css`. The consumer's `tokens.css` is the canonical source; the Tailwind preset already supplies `var(--color-X, #fallback)` defaults for any token the consumer omits.
+
+### Doctor: new gates
+
+- **Cascade-order check** — flags `@import` of engine's tokens.css from consumer's `global.css`. Always-on (not skipped in `--preflight`) — this is a structural file bug regardless of integration phase.
+- **Demo content detection** — fatal if `src/content/posts/` still contains `hello-world.mdx`, `seo-checklist.mdx`, or `why-not-wordpress.mdx`. Warns on demo `jane.json` author.
+- **`--final` mode** — strictest gate. Requires:
+  - All default checks pass
+  - `--phase9-confirmed` flag (self-attestation that Phase 9 questions were actually asked)
+  - `--feedback-status=provided` (with `FEEDBACK-FOR-CLAUDE-*.md` file present) OR `--feedback-status=none-needed` (explicit declaration)
+
+### Skill: structural enforcement
+
+- **New Phase 1.5 — Replace demo content (mandatory).** Two valid outcomes: empty `src/content/posts/` or replace with real site content. Doctor enforces.
+- **Phase 9 strengthened** — heading changed from "ASK the user" to "MANDATORY — actually execute, not 'consider'". Body explicitly calls out the failure mode: "Do not rationalise it as 'optional' or 'for later' or 'the user can ask if they want.'" Done-check requires running `--final --phase9-confirmed --feedback-status=...` to declare done.
+- **Final blocking checkpoint rewritten** — single command (`npx shipwreck-blog-doctor --final --phase9-confirmed --feedback-status=...`) is the ONLY gate for declaring done. Skill explicitly enumerates self-deception patterns ("doctor passed so I'm done", "it builds and serves so it's working", "I'll write feedback if I think of something") and blocks each.
+
+### Integration test (acceptance CI): new assertions
+
+- Asserts `global.css` does not contain `@import` of engine tokens.css (cascade-order regression check)
+- Asserts compiled CSS has at most one `--color-bg` declaration (catches cascade leak)
+- Asserts doctor's demo-content detection fires correctly
+- Asserts doctor's cascade-order pass message fires
+- Asserts `--final` blocks without `--phase9-confirmed`
+- Asserts `--final` blocks without `--feedback-status`
+
+38/38 checks pass on v0.3.4 tree.
+
+### Migration from 0.3.3
+
+Existing 0.3.3 sites:
+1. Remove `@import "@shipwreck/blog-theme-default/tokens.css"` from `src/styles/global.css` if present
+2. `npm update @shipwreck/blog-core @shipwreck/blog-theme-default`
+3. `rm -rf node_modules/.cache _blog/dist _blog/.astro`
+4. `npm run build`
+5. Verify: dark/branded theme should now actually render (you'll see the immediate visual change if you'd been hit by the cascade bug)
+
 ## [0.3.3] - 2026-04-29
 
 Patch release adding the integration acceptance CI test (Nyxi feedback #7) — closes the loop on "regressions hit Nyxi before they hit CI."

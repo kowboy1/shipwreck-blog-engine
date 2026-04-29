@@ -1,4 +1,17 @@
-@import "@shipwreck/blog-theme-default/tokens.css";
+/*
+ * global.css — site-level styling that goes alongside the consumer's tokens.css.
+ *
+ * IMPORTANT: do NOT import the engine's tokens.css here.
+ * - The consumer's `src/styles/tokens.css` is the canonical source of all theme values
+ * - The Tailwind preset already provides fallback defaults via `var(--color-X, #fallback)`
+ *   for any token the consumer doesn't define
+ * - Importing the engine's tokens.css from here would CASCADE OVER the consumer's
+ *   carefully-extracted host values and ruin the integration (this exact bug bit
+ *   wollongong-weather's first install — see CHANGELOG 0.3.4)
+ *
+ * BaseLayout.astro imports tokens.css FIRST (defines the values) then this file
+ * (uses the values via Tailwind utilities + the body/h1 rules below).
+ */
 
 @tailwind base;
 @tailwind components;

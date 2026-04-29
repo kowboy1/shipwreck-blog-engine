@@ -16,23 +16,37 @@
  *   npx shipwreck-blog-doctor --preflight      # install-level only (engine resolves, file: deps OK)
  *   npx shipwreck-blog-doctor --skip-build     # skip the build check (faster)
  *   npx shipwreck-blog-doctor --json           # machine-readable output
+ *   npx shipwreck-blog-doctor --final \        # strictest mode: declare integration done
+ *     --phase9-confirmed \                     #   require Phase 9 questions asked
+ *     --feedback-status=provided               #   require feedback file OR
+ *     # OR --feedback-status=none-needed       #   explicit no-feedback declaration
  *
  * Mode summary:
  *   --preflight   = run RIGHT AFTER npm install. Skips Phase 2/3/build checks.
  *                   Catches install-time bugs (broken symlinks, scaffold corruption).
- *   (default)     = run BEFORE declaring done. Includes everything: install +
- *                   Phase 2/3 checks (tokens.css present, SiteShell ported) +
- *                   build verification + CSS class sanity check.
+ *   (default)     = run BEFORE the final completion check. Includes install +
+ *                   Phase 2/3 checks (tokens.css present, SiteShell ported,
+ *                   global.css cascade order, no demo content) + build + CSS sanity.
+ *   --final       = the gate for declaring integration DONE. Default checks PLUS
+ *                   requires --phase9-confirmed and --feedback-status=<provided|none-needed>.
+ *                   You cannot reach 0 fatal in --final mode without explicitly
+ *                   confirming you completed the end-of-job protocol.
  */
 import { existsSync, readFileSync, statSync, readdirSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { execSync } from "node:child_process"
 import process from "node:process"
 
-const args = new Set(process.argv.slice(2))
+const argv = process.argv.slice(2)
+const args = new Set(argv)
 const PREFLIGHT = args.has("--preflight")
 const SKIP_BUILD = args.has("--skip-build") || PREFLIGHT
 const JSON_OUT = args.has("--json")
+const FINAL = args.has("--final") // strictest mode: requires Phase 9 + feedback flags
+const PHASE9_CONFIRMED = args.has("--phase9-confirmed")
+// --feedback-status=<provided|none-needed>
+const feedbackArg = argv.find((a) => a.startsWith("--feedback-status="))
+const FEEDBACK_STATUS = feedbackArg ? feedbackArg.split("=")[1] : null
 const CWD = process.cwd()
 
 const checks = []
@@ -165,6 +179,68 @@ if (footerPath) {
 
 } // end !PREFLIGHT block (Phase 2/3 checks)
 
+// 5b. Cascade-order check: consumer's `global.css` must NOT @import the engine's
+// tokens.css. Importing it cascades engine defaults OVER the consumer's
+// carefully-extracted host values, silently undoing Phase 2 work.
+// (This is the bug that broke wollongong-weather's first integration.)
+const globalCssCandidates = ["src/styles/global.css", "_blog/src/styles/global.css"]
+  .map((p) => resolve(CWD, p))
+  .filter((p) => existsSync(p))
+for (const cssPath of globalCssCandidates) {
+  const c = readFileSync(cssPath, "utf8")
+  if (/@import\s+["'].*@shipwreck\/blog-theme-default\/tokens\.css/.test(c)) {
+    fail(
+      "global.css imports the engine's tokens.css",
+      `${cssPath.replace(CWD, ".")} contains '@import "@shipwreck/blog-theme-default/tokens.css"'. ` +
+        `This cascades the engine's default values OVER your consumer tokens.css and reverts the theme to engine defaults. ` +
+        `Fix: remove that @import line. Your src/styles/tokens.css is the canonical source — fallbacks are handled by the Tailwind preset's var(--color-X, #default) syntax.`,
+    )
+  } else {
+    pass("global.css cascade order is correct (no engine tokens override)")
+  }
+}
+
+// 5c. Demo content detection: a real integration must NOT ship the demo posts.
+// Skipped in preflight (preflight = install only; demo content cleanup is
+// Phase 1.5 of integration, not part of installing the scaffold).
+if (!PREFLIGHT) {
+  const postsCandidates = ["src/content/posts", "_blog/src/content/posts"]
+    .map((p) => resolve(CWD, p))
+    .filter((p) => existsSync(p))
+  const DEMO_POST_SLUGS = ["hello-world.mdx", "seo-checklist.mdx", "why-not-wordpress.mdx"]
+  for (const postsDir of postsCandidates) {
+    const present = readdirSync(postsDir).filter((f) => DEMO_POST_SLUGS.includes(f))
+    if (present.length > 0) {
+      fail(
+        "Demo posts still in src/content/posts/",
+        `Found: ${present.join(", ")}. These ship with the engine demo as boilerplate; a real integration must replace them with site-specific content (or empty the dir). Delete them, then add at least one real post for the host site OR explicitly mark the site as "no posts yet" by leaving content/posts/ empty (just the dir, no .mdx files).`,
+      )
+    } else {
+      pass("No demo content in src/content/posts/")
+    }
+  }
+
+  const authorsCandidates = ["src/content/authors", "_blog/src/content/authors"]
+    .map((p) => resolve(CWD, p))
+    .filter((p) => existsSync(p))
+  for (const authorsDir of authorsCandidates) {
+    for (const file of ["jane.json"]) {
+      const path = join(authorsDir, file)
+      if (existsSync(path)) {
+        try {
+          const a = JSON.parse(readFileSync(path, "utf8"))
+          if (a.name === "Jane Doe" || a.name === "Demo Author") {
+            warning(
+              "Demo author 'jane.json' still has demo defaults",
+              `${path.replace(CWD, ".")} — replace with a real author or remove the file.`,
+            )
+          }
+        } catch { /* ignore */ }
+      }
+    }
+  }
+}
+
 // 6. Source-vs-deploy layout guardrail (Nyxi feedback #6)
 // The blog SOURCE repo should not be the same dir as the host's static MOUNT path.
 // If you accidentally point your blog source at the host's docroot, you'll
@@ -217,6 +293,56 @@ if (!SKIP_BUILD) {
         pass("Built CSS contains all engine utility classes", `${cssFiles.length} CSS file(s)`)
       }
     }
+  }
+}
+
+// 9. FINAL-MODE gates: Phase 9 confirmation + feedback declaration
+// These flags are how the agent confirms they've completed the protocol.
+// Without them, --final cannot pass.
+if (FINAL) {
+  if (!PHASE9_CONFIRMED) {
+    fail(
+      "Phase 9 questions not confirmed",
+      "You ran --final without --phase9-confirmed. The integration skill's Phase 9 requires asking the user about: latest-3 callout, RSS link, GSC submission, cross-link plan, Sveltia CMS enablement. " +
+        "Pass --phase9-confirmed only AFTER you have asked every question and acted on or logged the answer. Do not pass this flag if you skipped Phase 9.",
+    )
+  } else {
+    pass("Phase 9 questions confirmed (--phase9-confirmed flag passed)")
+  }
+
+  if (FEEDBACK_STATUS === "provided") {
+    // Find the FEEDBACK file
+    const candidates = readdirSync(CWD).filter((f) => f.startsWith("FEEDBACK-FOR-CLAUDE-") && f.endsWith(".md"))
+    // Also check engine repo root if we can find it
+    const enginePkg = resolvePackageJson("@shipwreck/blog-core", CWD)
+    let engineRoot = null
+    if (enginePkg) {
+      // walk up from package.json: .../packages/blog-core/package.json -> .../
+      engineRoot = resolve(enginePkg.path, "..", "..", "..")
+    }
+    const engineCandidates = engineRoot && existsSync(engineRoot)
+      ? readdirSync(engineRoot).filter((f) => f.startsWith("FEEDBACK-FOR-CLAUDE-") && f.endsWith(".md"))
+      : []
+
+    if (candidates.length === 0 && engineCandidates.length === 0) {
+      fail(
+        "Feedback status is 'provided' but no FEEDBACK-FOR-CLAUDE-*.md found",
+        `Searched ${CWD} and ${engineRoot ?? "(engine root not located)"}. ` +
+          `Either write the feedback file, OR pass --feedback-status=none-needed.`,
+      )
+    } else {
+      pass(
+        "Feedback file present",
+        [...candidates.map((f) => `${CWD}/${f}`), ...engineCandidates.map((f) => `${engineRoot}/${f}`)].join(", "),
+      )
+    }
+  } else if (FEEDBACK_STATUS === "none-needed") {
+    pass("Feedback status: none needed (declared explicitly)")
+  } else {
+    fail(
+      "Feedback status not declared",
+      "You ran --final without --feedback-status=provided or --feedback-status=none-needed. The skill requires you to either write a FEEDBACK-FOR-CLAUDE-<job>.md OR explicitly declare 'no engine feedback this run'. Pick one.",
+    )
   }
 }
 

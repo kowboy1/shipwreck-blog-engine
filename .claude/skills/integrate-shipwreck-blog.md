@@ -215,6 +215,29 @@ cd _blog && npm install && npm run dev
 
 ---
 
+## Phase 1.5 — Replace demo content (mandatory)
+
+> **Precondition:** Phase 1 done.
+>
+> **Done-check:** `src/content/posts/` does NOT contain `hello-world.mdx`, `seo-checklist.mdx`, or `why-not-wordpress.mdx`. **`npx shipwreck-blog-doctor` does NOT flag "Demo posts still in src/content/posts/".** Either the dir is empty (acceptable for a fresh integration with no posts yet) OR contains real site-specific content. Demo `jane.json` author has been removed or replaced.
+
+The engine demo ships with three example posts (`hello-world.mdx`, `seo-checklist.mdx`, `why-not-wordpress.mdx`) and a demo author (`jane.json`). These are scaffolding for the engine's own development — **they must not ship as the live blog content of any real site.**
+
+Two valid outcomes:
+
+1. **Empty the posts dir** (typical for new sites with no content yet):
+   ```bash
+   cd _blog/src/content/posts
+   rm hello-world.mdx seo-checklist.mdx why-not-wordpress.mdx
+   ```
+2. **Replace with at least one real post** — write or accept a draft from the user with site-specific content. See the [add-shipwreck-blog-post skill](add-shipwreck-blog-post.md) for the post-writing runbook.
+
+Also remove or replace demo author `_blog/src/content/authors/jane.json`. Real authors only.
+
+Verify: `npx shipwreck-blog-doctor` (default mode, no flags) returns no "Demo posts" or "Demo author" findings.
+
+---
+
 ## Phase 2 — Extract host design tokens
 
 > **Precondition (must be true to start this phase):** Phase 1 done-check passed (engine packages resolve, doctor green on the package check).
@@ -498,14 +521,15 @@ These are NOT default integration tasks — only do them if Phase 9 questions tr
 
 ---
 
-## Phase 9 — Post-install integration questions (ASK the user)
+## Phase 9 — Post-install integration questions (MANDATORY — actually execute, not "consider")
 
 > **Precondition (must be true to start this phase):** Phase 8 done — site registered + monitored.
 >
-> **Done-check (must be true before proceeding to the next phase):** Every question in the list below has been asked of the user, and their answer has been acted on (work done now) or logged as a deferred follow-up in the site's vault topic note. **Do not skip the questions — they're the difference between a blog that just exists and a blog that's actually integrated into the site's discovery, content, and ops.**
+> **Done-check (must be true before declaring the integration complete):** Every question in the list below has been **asked of the user in this session** (not just acknowledged in your head, not just listed in a status report — actually presented as questions to the user, with their answers acted on or logged). Then `npx shipwreck-blog-doctor --final --phase9-confirmed --feedback-status=<provided|none-needed>` returns 0 fatal issues.
+>
+> **⚠️ This phase is the most-skipped phase by agents because it requires interactive output rather than file work.** Do not rationalise it as "optional" or "for later" or "the user can ask if they want." The integration skill explicitly requires you to present these questions to the user. If you finish without asking, you have not completed the integration — you have done a partial install and lied about it being done. Doctor's `--final` mode enforces this with the `--phase9-confirmed` flag: only pass that flag AFTER you've actually asked.
 
-
-After verifying the blog is live and themed correctly, ask the user about optional integrations. **Don't assume** — present each as a question. The user may want some, none, or all:
+After verifying the blog is live and themed correctly, **ask the user the questions below**. Don't assume answers. Don't skip on the user's behalf. Don't list them in your status message instead of asking. Present them as questions, get answers, act on each one:
 
 1. **"Want a 'Latest 3 posts' callout on the homepage?"**
    The blog publishes `/blog/posts.json` listing every post. We can wire a small fetch into the host's homepage build that pulls the most recent 3 and renders them as cards. If yes, ask where on the homepage they should appear.
@@ -567,32 +591,42 @@ The site is now fully self-updating. Future engine releases auto-propagate throu
 
 ## 🛑 Before you report "done" to the user — final blocking checkpoint
 
-Run this checklist top-to-bottom. **Every box must be ticked.** If any box can't be ticked, the integration isn't done — go back and finish.
+The doctor's `--final` mode is the single command that gates "you may report this as done."
 
-```
-[ ] All 9 phases above have their done-check satisfied
-[ ] `npm run doctor` from the per-site repo — output shows zero ✗ (fatal) issues
-[ ] Visit https://<domain>/blog/ in a browser — page loads and visually matches the host
-[ ] Visit https://<domain>/blog/<a-post-slug>/ — post page renders with proper H1, ToC, header, footer
-[ ] .shipwreck/sites.json has this site's entry (Phase 8)
-[ ] All Phase 9 questions have been asked, answers acted on or logged
-[ ] One of: FEEDBACK-FOR-CLAUDE-<job>.md exists in engine repo, OR you have explicitly told the user "no engine feedback this run"
-[ ] One of: stack-notes session log written, OR you have explicitly told the user "no new stack-specific quirks observed"
+```bash
+npx shipwreck-blog-doctor --final \
+  --phase9-confirmed \
+  --feedback-status=provided     # if you wrote a FEEDBACK-FOR-CLAUDE-<job>.md
+  # OR --feedback-status=none-needed  # if explicitly nothing to feed back this run
 ```
 
-**If you skip this checkpoint and report done, the user will catch it and ask you to redo.** Specifically: they will run `npm run doctor` themselves, see fatal issues, and the trust round-trip costs more than the 60 seconds it takes to run through this checklist.
+**If this command does not return exit 0 with all checks passing, the integration is not done.** Period. Do not report done. Go back and fix the failures.
 
-When you report done, your status message should include:
+The `--phase9-confirmed` flag is a self-attestation: by passing it, you are stating that you have asked the user every Phase 9 question in this session, in actual interactive output. **If you skipped Phase 9, do not pass this flag — fix Phase 9 first.**
+
+The `--feedback-status` flag is required:
+- `--feedback-status=provided` — you wrote a `FEEDBACK-FOR-CLAUDE-<job-name>.md` file at the engine repo root with anything that should improve the engine for future integrations
+- `--feedback-status=none-needed` — you explicitly considered whether anything in the engine/skill could be improved based on this run AND determined nothing useful would come from a feedback note. Be honest. Most real integrations have at least one rough edge worth feeding back.
+
+Once `--final` returns 0 fatal, your status message to the user MUST include this audit trail block:
 
 ```
 Integration done. Verifications:
-- npm run doctor: ✓ all checks passed
-- Visual diff: ✓ <X% per region
-- Live URL: https://<domain>/blog/ rendering correctly
+- shipwreck-blog-doctor --final: ✓ all checks passed
+- Live URL: https://<domain>/blog/ rendering correctly + visually matches host
 - Registry: .shipwreck/sites.json updated
-- Phase 9 questions: asked, [N] follow-ups logged
-- Engine feedback: [link to FEEDBACK doc OR "no feedback this run"]
+- Phase 9 questions: asked all 7; answers — [summarise]
+- Engine feedback: [link to FEEDBACK doc OR "no feedback needed: [reason]"]
 - Stack quirks: [link to stack-notes log OR "no new quirks observed"]
 ```
 
-That status message is the user's audit trail. Without it, they don't know you actually verified — they just know you said you did.
+That status message is the user's audit trail. Skipping it (or fudging entries) is the same as lying about the integration being done. The user WILL run `--final` themselves to verify — save them the round-trip and do it honestly.
+
+### Failure modes to watch for in your own behaviour
+
+These are what previous agents (Nyxi, included) have done that produced broken integrations. If you catch yourself doing any of these, stop:
+
+- **"Optional questions I'll mention but not ask"** — Phase 9 questions are not optional. Ask them, in this session, as actual prompts to the user.
+- **"Doctor passed so I'm done"** — doctor's default mode passes Phase 1-3 checks; `--final` is the gate. Use `--final`.
+- **"It builds and serves so it's working"** — see the wollongong-weather first integration, where it built+served but the cascade-order bug meant the dark theme was overridden by engine defaults. Working ≠ integrated.
+- **"I'll write feedback if I think of something"** — write feedback now or pass `--feedback-status=none-needed` with an honest reason. The "I'll think about it later" path leads to the engine never improving.
