@@ -5,9 +5,7 @@
  * automatically pick up utility classes used inside `@shipwreck/blog-core`
  * components — without having to remember to add the path themselves.
  *
- * The path resolves relative to the consumer's tailwind.config working
- * directory; npm (workspaces or normal installs) places the package at
- * `./node_modules/@shipwreck/blog-core/` in both cases.
+ * Token contract: ./TOKEN-CONTRACT.md
  *
  * @type {import('tailwindcss').Config}
  */
@@ -21,16 +19,28 @@ export default {
         primary: "var(--color-primary, #0f172a)",
         accent: "var(--color-accent, #2563eb)",
         bg: "var(--color-bg, #ffffff)",
+        "bg-elevated": "var(--color-bg-elevated, #f8fafc)",
         text: "var(--color-text, #0f172a)",
         muted: "var(--color-muted, #64748b)",
         border: "var(--color-border, #e2e8f0)",
+        link: "var(--color-link, var(--color-accent, #2563eb))",
+        "link-hover": "var(--color-link-hover, var(--color-primary, #0f172a))",
       },
       fontFamily: {
         sans: ["var(--font-sans, system-ui)", "sans-serif"],
         heading: ["var(--font-heading, var(--font-sans, system-ui))", "serif"],
+        mono: ["var(--font-mono, ui-monospace)", "monospace"],
       },
       borderRadius: {
         card: "var(--radius-card, 0.75rem)",
+        button: "var(--radius-button, 9999px)",
+        chip: "var(--radius-chip, 9999px)",
+      },
+      boxShadow: {
+        card: "var(--shadow-card, 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06))",
+      },
+      ringColor: {
+        focus: "var(--color-focus-ring, rgb(37 99 235 / 0.6))",
       },
     },
   },

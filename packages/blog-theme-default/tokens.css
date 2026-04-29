@@ -1,13 +1,49 @@
+/*
+ * Default theme tokens for @shipwreck/blog-theme-default.
+ *
+ * These are the FALLBACK values the engine ships with. Consumer sites
+ * override any subset by loading their own tokens.css after this file
+ * (or by inlining their values in the consumer's BaseLayout / global css).
+ *
+ * Full token contract: see TOKEN-CONTRACT.md
+ */
 :root {
+  /* Colors */
+  --color-bg: #ffffff;
+  --color-bg-elevated: #f8fafc;
+  --color-text: #0f172a;
   --color-primary: #0f172a;
   --color-accent: #2563eb;
-  --color-bg: #ffffff;
-  --color-text: #0f172a;
   --color-muted: #64748b;
   --color-border: #e2e8f0;
+  --color-link: var(--color-accent);
+  --color-link-hover: var(--color-primary);
+  --color-focus-ring: color-mix(in srgb, var(--color-accent) 60%, transparent);
 
-  --font-sans: system-ui, -apple-system, sans-serif;
+  /* Typography */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-heading: var(--font-sans);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-size-base: 1rem;
+  --line-height-base: 1.65;
+  --tracking-heading: -0.01em;
 
+  /* Surface */
   --radius-card: 0.75rem;
+  --radius-button: 9999px;
+  --radius-chip: 9999px;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06);
+
+  /* Buttons */
+  --button-bg: var(--color-primary);
+  --button-text: var(--color-bg);
+  --button-hover-bg: var(--color-accent);
+  --button-padding-y: 0.625rem;
+  --button-padding-x: 1.25rem;
+  --button-font-weight: 600;
+
+  /* Header (optional, used by SiteShell/Header.astro when it reads tokens) */
+  --header-bg: var(--color-bg);
+  --header-height: 4rem;
+  --header-border: var(--color-border);
 }

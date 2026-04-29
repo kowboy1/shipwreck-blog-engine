@@ -1,0 +1,12 @@
+[
+  {
+    "name": "wollongong-weather",
+    "repo": "1tronic/wollongong-weather",
+    "branch": "main",
+    "blogPath": "_blog",
+    "engineVersion": "0.2.0",
+    "deployedAt": "https://wollongongweather.com/blog/",
+    "owner": "rick",
+    "notes": "First proof-of-concept integration. Uses file: dep during dev; switch to git+ssh once first site is canonical."
+  }
+]
