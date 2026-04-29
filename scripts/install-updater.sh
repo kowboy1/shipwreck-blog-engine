@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # install-updater.sh — One-shot installer for shipwreck-updater.php on a host.
 #
-# Usage (run on the consumer host, NOT locally):
-#   curl -fsSL https://raw.githubusercontent.com/1tronic/shipwreck-blog-engine/main/scripts/install-updater.sh | bash -s -- \
-#     --release-repo 1tronic/wollongong-weather-blog \
+# Usage (run on the consumer host, NOT locally — placeholders shown):
+#   curl -fsSL https://raw.githubusercontent.com/<engine-org>/shipwreck-blog-engine/main/scripts/install-updater.sh | bash -s -- \
+#     --release-repo <git-org>/<site-name>-blog \
 #     --install-path ~/public_html/blog \
-#     --domain wollongongweather.com
+#     --domain <domain>
 #
 # What it does:
 #   1. Downloads shipwreck-updater.php into ~/public_html/
@@ -27,7 +27,7 @@ INSTALL_PATH=""
 DOMAIN=""
 CONFIG_DIR=""
 PUBLIC_DIR=""
-ENGINE_REPO="1tronic/shipwreck-blog-engine"
+ENGINE_REPO="${SHIPWRECK_ENGINE_REPO:-1tronic/shipwreck-blog-engine}"
 CF_ZONE_ID=""
 CF_TOKEN=""
 DRY_RUN=0

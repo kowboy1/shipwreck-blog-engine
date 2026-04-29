@@ -16,7 +16,7 @@ npx playwright install chromium
 Visit a host site and emit a draft `tokens.css` with values sampled from computed styles.
 
 ```bash
-node scripts/extract-theme.mjs https://wollongongweather.com > tokens.draft.css
+node scripts/extract-theme.mjs https://<host-domain> > tokens.draft.css
 ```
 
 Heuristics are best-effort — every value should be reviewed before use. The output marks unreliable tokens with `/* TODO: confirm ... */` comments.
@@ -32,7 +32,7 @@ Compare a host page to a freshly-themed blog page and report per-region pixel di
 cd _blog && npm run build && npx astro preview --host 0.0.0.0 --port 4322 &
 
 # Then diff
-node scripts/visual-diff.mjs https://example.com http://localhost:4322/blog/some-post/
+node scripts/visual-diff.mjs https://<host-domain> http://localhost:4322/blog/<slug>/
 ```
 
 Output is one line per run plus a region breakdown on failure:

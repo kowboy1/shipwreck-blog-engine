@@ -41,10 +41,32 @@ examples/
 
 ## Versioning rules
 
-- **Don't break the post schema** without a major bump and a migration note in `UPGRADE-GUIDE.md`.
+- **Bump only the patch (last) decimal place** unless the user explicitly approves a minor or major bump. `0.3.1 → 0.3.2 → 0.3.3 → ... → 0.3.99 → 0.3.100`. Even when a change feels semver-justifying as a minor bump, bump patch and note in the CHANGELOG why this would normally warrant higher — the user decides whether to retag.
+- **Don't break the post schema** without an explicit major bump approved by the user, plus a migration note in `UPGRADE-GUIDE.md`.
 - New schema fields must be optional or have defaults.
 - New component props must be optional.
-- Renaming a component or its export = major bump.
+
+## Hosting / CDN / site agnosticism is a hard rule
+
+The engine and its universal docs (skills in `.claude/skills/`, README, ROLLOUT, scripts) **must not** contain hosting-specific, server-specific, DNS-specific, or CDN-specific assumptions. The engine is designed to install onto any static-file-serving host on earth — bake one stack in and we lose that.
+
+When in doubt:
+
+- ✅ "the host's webserver may need a rewrite skip for `/blog/*`; for Apache/.htaccess that looks like X, for nginx like Y, for static hosts no action"
+- ✅ "if the host sits behind a CDN, configure cache purge; if not, skip"
+- ❌ "On Prem4, edit the Apache vhost at `/etc/apache2/sites-enabled/...`"
+- ❌ "Cloudflare zone IDs go in `cloudflare.zoneId`" (correct: "CDN config goes in `cdn.*` with a `provider` field — Cloudflare is one provider")
+
+Stack-specific quirks discovered during real integrations belong in `.claude/skills/stack-notes/<stack>.md`, never in the universal docs. See `.claude/skills/stack-notes/README.md` for the convention.
+
+One-off handover docs (e.g. `HANDOVER-NYXI.md`, `HANDOFF-NYXI-REBUILD-WOLLONGONG-031.md`) ARE allowed to be specific — they describe one specific job, not the universal procedure. Keep them out of the index of "files agents should read for general context".
+
+## When adding something to the engine, ask yourself
+
+1. Does this add a hosting/server/CDN-specific assumption to a universal doc? → No, it must not. Refactor to a placeholder + (optional) `stack-notes/<stack>.md` entry.
+2. Does this require a new theming knob? → Add it to `TOKEN-CONTRACT.md` first (with a how-to-find-it-on-the-host recipe), then to `tokens.css`, then to the Tailwind preset.
+3. Does this add a new file the integration agent must read? → Update the index in [README.md](README.md). The README is the single source of truth for "what every file in this repo is for".
+4. Does this need to propagate to existing sites? → Make sure the change lives inside the package (not in per-site templates). Consumer sites should only need `npm update + rebuild`, not template patches.
 
 ## Testing changes
 

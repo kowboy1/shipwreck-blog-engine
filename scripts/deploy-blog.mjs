@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 /**
- * deploy-blog.mjs — Push-style deploy for SSH-capable hosts (Prem3, Prem4, ops).
+ * deploy-blog.mjs — Push-style deploy for SSH-capable hosts.
+ *
+ * Use this when we control SSH/SFTP on the target host AND want to push
+ * a build immediately, instead of waiting for the host's daily cron to
+ * pull the next release. Works with any host: dedicated VPS, cPanel
+ * with shell access, anything that accepts rsync or SFTP.
  *
  * Usage:
- *   node scripts/deploy-blog.mjs --site wollongong-weather
- *   node scripts/deploy-blog.mjs --site wollongong-weather --dry-run
+ *   node scripts/deploy-blog.mjs --site <site-name>
+ *   node scripts/deploy-blog.mjs --site <site-name> --dry-run
  *   node scripts/deploy-blog.mjs --all
  *
  * Reads from .shipwreck/sites.json. For each site with deploy.method === "rsync"
@@ -15,11 +20,12 @@
  *   4. Optional: Cloudflare cache purge for the zone
  *   5. Update site's engineVersion in sites.json
  *
- * NOTE: this is the "push-style" deploy used for hosts where we control SSH
- * (Prem3/Prem4). For cheap shared cPanel and any host where we DON'T have
- * SSH credentials, sites pull updates themselves via shipwreck-updater.php
- * (see scripts/shipwreck-updater.php). The pull model is the universal default;
- * this script is for the faster push path on our own servers.
+ * NOTE: this is the "push-style" deploy used when we have SSH/SFTP into the
+ * host. For hosts where we DON'T have shell access (most cheap shared cPanel,
+ * any client-owned server), sites pull updates themselves via
+ * shipwreck-updater.php (see scripts/shipwreck-updater.php). The pull model
+ * is the universal default; this script is for the faster push path when
+ * available.
  *
  * Requires: node 20+, ssh, rsync (or lftp for sftp/ftp method).
  *
@@ -176,7 +182,7 @@ async function purgeCloudflare(zoneId, domain) {
 async function readCloudflareToken() {
   if (process.env.CLOUDFLARE_API_TOKEN) return process.env.CLOUDFLARE_API_TOKEN.trim()
   const tokenPath = process.env.CLOUDFLARE_API_TOKEN_PATH
-    ?? "/mnt/d/NyXi's Vault/Secrets/cloudflare-api-token.txt"
+  if (!tokenPath) return null
   try {
     return (await readFile(tokenPath, "utf8")).trim()
   } catch {

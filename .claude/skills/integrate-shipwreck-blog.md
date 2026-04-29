@@ -4,85 +4,90 @@ description: Integrate the Shipwreck Blog Engine into a host site. Triggers when
 
 # Skill — Integrate Shipwreck Blog into a Host Site
 
-You are integrating `@shipwreck/blog-engine` into a host site. The end state:
+You are integrating `@shipwreck/blog-engine` into a host site. **This skill is hosting-, DNS-, and CDN-agnostic.** It works for any host that can serve static files (every cPanel tier, Plesk, DirectAdmin, OpenLiteSpeed, raw nginx/Apache, S3+CloudFront, Cloudflare Pages, Netlify, Vercel, GitHub Pages, a self-hosted VPS, an old-school FTP-only shared host — anything).
 
-1. A **per-site GitHub repo** (e.g. `1tronic/wollongong-weather-blog`) holds the blog source — site config, theme tokens, SiteShell, content/posts, content/authors. A GitHub Action there builds the static blog and publishes a tarball to GitHub Releases on every engine update.
-2. The **host site server** has `shipwreck-updater.php` + a daily cron that pulls the latest release tarball and atomically swaps it into `<docroot>/blog/`.
-3. The blog is **themed to look native** to the host site and **self-updates** without any further action from us.
+The end state:
+
+1. A **per-site source repo** (typically on GitHub) holds the blog source — site config, theme tokens, SiteShell, content/posts, content/authors. A CI workflow builds the static blog and publishes a tarball release on every engine update.
+2. The **host site** serves the built blog at `<docroot>/blog/` (or whatever subpath was chosen). For hosts with PHP+cron, `shipwreck-updater.php` runs daily and self-updates. For hosts without PHP, an external runner (or scheduled GitHub Action) pushes the build via SSH/SFTP/FTP.
+3. The blog is **themed to look native** to the host site.
 
 **Don't improvise.** Follow the procedure. Every phase has an output you can verify. If a verification fails, fix that phase before moving on.
 
 ---
 
-## Inputs you need from the user before starting
+## Inputs you need before starting
 
-1. **Host site name and domain** (e.g. "Wollongong Weather", `wollongongweather.com`)
-2. **Server the host runs on** — Prem3, Prem4, Cloudflare Pages, or external (cheap shared cPanel, etc.)
-3. **Where the blog mounts** — usually `/blog/`. **This is locked in for the life of the site** — internal links bake it in, so moving it later breaks every blog URL. Confirm with the user before proceeding if it's anything other than `/blog/`.
-4. **Cloudflare zone ID** for the domain (look it up in the Cloudflare dashboard) — needed for cache purge after updates
-5. **Whether a per-site GitHub repo exists** for the blog source (if not, you'll create one in Phase 1)
-6. **Where the host site's main nav lives** (which file or component) — needed in Phase 7 to add a "Blog" entry
-7. **Where the host site's footer lives** (which file or component) — needed in Phase 7 to add a "Blog" link
+These come from the user's prompt, OR you look them up via Harbour Control (the dashboard tracks every site → server → DNS provider → access method). Don't guess.
 
-If any are missing, ask. Don't guess.
+1. **Host site name and domain** — the live URL the blog will be added to
+2. **Hosting environment** — which server/platform the host site lives on (any cPanel tier, OpenLiteSpeed/CyberPanel box, dedicated VPS, Cloudflare Pages, Netlify, etc.). What matters: SSH/SFTP availability, whether it serves PHP, who has access.
+3. **DNS / CDN provider** — Cloudflare, AWS, the registrar's nameservers, etc. Only matters for the optional "purge cache after deploy" step. If unknown or no CDN, the engine works without it.
+4. **Where the blog mounts** — usually `/blog/`. **Locked in for the life of the site** — internal links bake the path in, so moving it later breaks every URL. Confirm with the user before proceeding if it's anything other than `/blog/`.
+5. **Whether a per-site source repo exists** — typically `<site-name>-blog` on the same git host as everything else. If not, Phase 1 creates one.
+6. **Where the host site's main nav lives** (which file or component) — for Phase 7 nav link
+7. **Where the host site's footer lives** — for Phase 7 footer link
+
+If any are missing AND you can't infer them from Harbour Control, ask the user.
 
 ---
 
 ## Choose a deploy mode FIRST (before any phases)
 
-The integration runs in one of three modes. Pick before starting Phase 1 — they branch the runbook in different places.
+Pick **one** of three modes based on the host's capabilities. They branch the runbook differently.
 
-### Mode A — Full production deploy (default)
+### Mode A — Self-update pull (universal, default for live sites)
 
-The site lives on a real production server (Prem3, Prem4, cheap shared cPanel, anywhere with SSH/SFTP/HTTP). Self-update via `shipwreck-updater.php` + cron pulling from a per-site GitHub repo's releases.
+The host can run PHP and cron. Daily cron hits a token-protected `shipwreck-updater.php` endpoint, which polls the per-site repo's GitHub Releases and atomically swaps in newer builds.
 
-**Use when:** integrating into a live client site that's actually deployed somewhere we control or have access to.
+**Use when:** the host runs on any cPanel / Plesk / DirectAdmin / OpenLiteSpeed / nginx+php-fpm / Apache+mod_php — basically anywhere that ships PHP. **This is the default.** If unsure, this is the right answer.
 
-**Includes:** all 9 phases. Cloudflare zone setup, GH per-site repo, GH Actions, host-side updater install, cron, Uptime Kuma monitor.
+**Includes:** all 9 phases. Per-site source repo, build CI, host-side updater install, cron, optional cache purge wiring, optional uptime monitor.
 
-### Mode B — Local-dev integration (no remote, no Cloudflare, no GH workflow)
+**Does NOT require:** SSH access from us to the host, control over the DNS, a specific CDN, root, or anything beyond a normal cPanel control-panel account.
 
-The site is being developed locally — usually on `/home/rick/projects/<site>/`, often served via a Cloudflare Tunnel or local dev server (e.g. `python3 -m http.server`). No real production deploy yet. We just need the blog rendering correctly inside the local site so the user can iterate before going live.
+### Mode B — Local-dev integration (no remote, no CI, no CDN)
 
-**Use when:** the user says "set this up locally", "just integrate it for dev", "I'll deploy later", or the host site isn't on a production server yet.
+The site is being developed locally and isn't on a production host yet. Often served via a tunnel (Cloudflare Tunnel, ngrok, etc.) or a local dev server. No CI, no remote install, no cache purge.
 
-**Skip these phases:**
-- Phase 1's `gh repo create` step — keep the per-site source as a local directory, no remote
-- Phase 6's host-side installer (`install-updater.sh`) — no remote host to install on
-- Phase 6's "trigger first update via curl" step
-- Phase 8's Uptime Kuma monitor
+**Use when:** the user says "set it up locally", "I'll deploy later", or the host site is currently a local checkout on the developer's machine.
 
-**Replace with:**
-- Build the blog source locally with `npm run build`
-- Copy `_blog/dist/` to `<host-site>/blog/` (or whatever subpath the local server serves from)
-- Document the build-and-copy command in the per-site repo's README so it's reproducible
+**Skip:** the per-site repo's GitHub create, the host-side updater install, any CI workflows, uptime monitor.
 
-**Run mostly normally:**
-- Phases 2 (tokens), 3 (SiteShell), 4 (CTAs), 5 (visual verification), 7 (host wiring — footer link, optional nav, robots.txt) all still apply
-- Phase 8 still register in `.shipwreck/sites.json` but with `deploy.method: "manual"` and a note that it's local-dev only
+**Replace with:** local `npm run build` + copy `dist/` to `<host-site-checkout>/blog/`. Document the build-and-copy command in the per-site repo's README so it's reproducible.
 
-When the site is ready to go live later, re-enter the runbook at Phase 6 (production deploy) — the per-site source is already done, just needs a GH repo + the updater install.
+**Run normally:** Phases 2 (tokens), 3 (SiteShell), 4 (CTAs), 5 (visual verification), 7 (host wiring), 8 (registry, with `deploy.method: "manual"`).
 
-### Mode C — Hand-off / external host
+When the site goes to production later, re-enter at Phase 6 — the source is already built, just needs a remote + the updater install.
 
-The site is on a third-party host we don't control (client's own server, GoDaddy, etc.). We build the dist tarball; the client uploads it.
+### Mode C — Push from CI (when we control SSH but the host can't run the updater)
 
-**Use when:** the user explicitly says "we don't have access to that host" or the integration is for a site outside our hosting fleet.
+The host has SSH/SFTP we can use, but we'd rather push than have the host pull. Useful when the host's PHP version is too old, or when sub-minute deploy latency matters. We build in a runner (GitHub Action, local machine) and push the dist via rsync/lftp.
 
-**Phases:** 1, 2, 3, 4, 5, 7 (host wiring done by client), 8 (registry only, no monitor). Phase 6 produces the tarball and a one-page upload-instructions doc; the client takes it from there.
+**Use when:** the user wants push-style deploy AND we have working SSH/SFTP credentials for the host.
+
+**Phases:** all 9, but Phase 6 uses `scripts/deploy-blog.mjs` instead of `install-updater.sh`. Cron lives on our runner, not the host.
+
+### Mode D — Hand-off to external host (we don't control the host at all)
+
+The host is owned by a third party we don't have any access to. We build the dist tarball; the host owner uploads it themselves.
+
+**Use when:** the user explicitly says "we don't have access to that server" or the host is owned by someone outside our reach.
+
+**Phases:** 1, 2, 3, 4, 5, 7 (host wiring done by the third party), 8 (registry, no monitor). Phase 6 produces the tarball + a one-page upload-instructions doc.
 
 ---
 
-If unclear which mode applies, **ask the user**: "Is this going to a production server we'll deploy to, or just local dev for now?"
+If unclear which mode applies, ask: "Does the host run PHP+cron and can I SSH/control-panel into it?" — if yes, Mode A. If it's local dev, Mode B. If yes-to-SSH-but-want-push, Mode C. If we can't touch the host, Mode D.
 
 ---
 
 ## Critical model concept (read before Phase 1)
 
-Two repos, kept separate:
+Two repos, kept separate. **This applies regardless of which mode you chose.**
 
-- **Host site repo** (e.g. `1tronic/wollongong-weather`): the existing live website. The blog is **NOT installed here**. The only changes you make to this repo are: a footer link, a nav link, and optionally a `robots.txt` reference to the blog sitemap. **Do not** add `_blog/` here. **Do not** add `_blog/node_modules` to its `.gitignore`. **Do not** put any blog Astro source here.
-- **Per-site blog repo** (e.g. `1tronic/wollongong-weather-blog`): a SEPARATE GitHub repo containing only the blog source. Its GH Action builds + publishes release tarballs that the host's `shipwreck-updater.php` pulls.
+- **Host site repo**: the existing live website. The blog is **NOT installed here**. The only changes you make to this repo are: a footer link, a nav link, and optionally a `robots.txt` reference to the blog sitemap. **Do not** add `_blog/` here. **Do not** add `_blog/node_modules` to its `.gitignore`. **Do not** put any blog Astro source here.
+- **Per-site blog repo**: a SEPARATE git repo (typically `<site-name>-blog`) containing only the blog source. Its CI builds + publishes release tarballs that the host's updater pulls (or that we push to the host).
 
 If you find yourself committing to the host repo for anything other than the footer/nav/robots integration in Phase 7, **stop** — you're in the wrong place.
 
@@ -299,29 +304,43 @@ These prevent the very common "first update succeeds but `/blog/` returns 404 or
    mkdir -p /home/<domain>/public_html/blog
    ```
 
-2. **Add `.htaccess` rewrite skip BEFORE installing the updater.** If the host serves WordPress (or any framework) at the apex, the existing `.htaccess` likely has `RewriteRule . /index.php [L]` which would catch `/blog/*` requests. Add this **above** any framework rules in the host's `.htaccess`:
-   ```apacheconf
-   # Static blog mount — let Apache serve files directly
-   RewriteRule ^blog/ - [L]
-   ```
-   Test with `curl -I https://<domain>/blog/` — should return `200` (not `404` from WordPress) once the install path has any file in it.
+2. **If the host's webserver intercepts `/blog/*`, add an early skip.** Any host running an apex CMS (WordPress, Drupal, Ghost, etc.) likely has a rewrite rule that catches every path. The blog is a static directory — let the webserver serve it directly.
 
-3. **Cloudflare cache rule for `/blog/*`** — recommended add. Phase: `http_request_cache_settings`. When: `(http.request.uri.path matches "^/blog/")`. Action: `cache_level=cache_everything`, `edge_ttl=86400`. The updater purges cache on each successful update.
+   - **Apache / OpenLiteSpeed (`.htaccess`):** add **above** any framework rules:
+     ```apacheconf
+     # Static blog mount — let Apache serve files directly
+     RewriteRule ^blog/ - [L]
+     ```
+   - **nginx:** add a `location /blog/ { try_files $uri $uri/ =404; }` block before the catch-all that proxies to the framework
+   - **Cloudflare Pages / Netlify / Vercel / static hosts:** no action needed — they serve subpaths directly.
+
+   Test with `curl -I https://<domain>/blog/` — should return `200` (not the framework's 404) once the install path has any file in it.
+
+3. **CDN cache rule for `/blog/*` (optional, recommended if there's a CDN).** The blog is fully static; aggressive edge-caching is safe. The updater purges cache after each successful update via the configured CDN API.
+
+   - **Cloudflare:** Cache Rule, phase `http_request_cache_settings`, when `(http.request.uri.path matches "^/blog/")`, action `cache_level=cache_everything`, `edge_ttl=86400`.
+   - **Other CDNs (Fastly, BunnyCDN, AWS CloudFront, etc.):** equivalent rule — match path prefix, allow long edge TTL.
+   - **No CDN:** skip.
 
 ### Run the one-shot installer
 
-```bash
-# SSH into the host (Prem3/Prem4/cPanel/anywhere with shell access)
-# For shell-less cPanel tiers, run install-updater.sh from your machine and SFTP the
-# resulting shipwreck-updater.php + config; or use cPanel's terminal feature if available.
+The installer runs ON THE HOST. Use whichever shell access is available:
 
+- SSH (most VPS, Prem-style boxes, dedicated hosts): standard
+- cPanel "Terminal" feature (most cPanel tiers in the last few years): same effect
+- WHM root shell (if you're an admin): same
+- Shell-less cPanel: run `install-updater.sh` from a local machine, then SFTP `shipwreck-updater.php` + `.shipwreck-updater.config.php` into place yourself, and add the cron via the cPanel "Cron Jobs" UI.
+
+```bash
 curl -fsSL https://raw.githubusercontent.com/1tronic/shipwreck-blog-engine/main/scripts/install-updater.sh | bash -s -- \
-  --release-repo 1tronic/<site-name>-blog \
+  --release-repo <git-org>/<site-name>-blog \
   --install-path /home/<domain>/public_html/blog \
   --domain <domain> \
   --cloudflare-zone-id <ZONE_ID> \
   --cloudflare-token <CF_API_TOKEN>
 ```
+
+The `--cloudflare-*` flags are optional. Omit them if the host doesn't sit behind Cloudflare; the updater still works, it just skips cache purging.
 
 The installer:
 1. Downloads `shipwreck-updater.php` to the host's `public_html/`
@@ -419,7 +438,7 @@ After verifying the blog is live and themed correctly, ask the user about option
    If the user has the GSC property already verified, you can do this through GSC API or just give them the URL to add manually. Same for Bing Webmaster Tools.
 
 4. **"Are there specific host pages that should cross-link to specific blog posts?"**
-   E.g., for wollongong-weather, the suburb pages might reference relevant blog posts ("See our guide on East Coast Lows" on the Thirroul page). Get a list, then either edit the host repo or note for later.
+   E.g., for a local-news site the location/category pages might reference relevant blog posts ("See our guide on X"); for an e-commerce site product pages might reference how-to articles. Get a list from the user, then either edit the host repo or note for later.
 
 5. **"Want me to set up a content-writer onboarding doc for whoever writes posts going forward?"**
    Points them at the `add-shipwreck-blog-post` skill (for agents) or the Sveltia CMS at `/blog/admin/` (for humans).

@@ -7,7 +7,7 @@
  *   node scripts/visual-diff.mjs <host-url> <blog-url>
  *
  * Example:
- *   node scripts/visual-diff.mjs https://wollongongweather.com http://localhost:4322/blog/east-coast-low-explainer/
+ *   node scripts/visual-diff.mjs https://<host-domain>/ http://localhost:4322/blog/<slug>/
  *
  * Reports per-region mismatch percentages. Regions:
  *   - header        (top of page, ~80px)

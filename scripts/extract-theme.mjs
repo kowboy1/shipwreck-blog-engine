@@ -4,7 +4,7 @@
  * draft tokens.css the agent can review and finalize.
  *
  * Usage:
- *   node scripts/extract-theme.mjs https://wollongongweather.com > tokens.draft.css
+ *   node scripts/extract-theme.mjs https://<host-domain> > tokens.draft.css
  *
  * Or with a local file (offline analysis of a built site):
  *   node scripts/extract-theme.mjs file:///path/to/index.html > tokens.draft.css
