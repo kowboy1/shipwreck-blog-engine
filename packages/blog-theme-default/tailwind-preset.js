@@ -1,9 +1,13 @@
 /**
  * Shared Tailwind preset for Shipwreck Blog.
  *
- * Includes the engine's component sources in `content` so consumer sites
- * automatically pick up utility classes used inside `@shipwreck/blog-core`
- * components — without having to remember to add the path themselves.
+ * Includes the engine's component AND page sources in `content` so consumer
+ * sites automatically pick up utility classes used inside `@shipwreck/blog-core`
+ * — without having to remember to add the path themselves.
+ *
+ * The two scan paths cover:
+ *   - components/**  — atomic UI (PostCard, ArticleLayout, AuthorBio, etc.)
+ *   - pages/**       — page renderers (PostPage, ListingPage) added in 0.3.0
  *
  * Token contract: ./TOKEN-CONTRACT.md
  *
@@ -12,6 +16,7 @@
 export default {
   content: [
     "./node_modules/@shipwreck/blog-core/src/components/**/*.{astro,html,js,ts,jsx,tsx,md,mdx}",
+    "./node_modules/@shipwreck/blog-core/src/pages/**/*.{astro,html,js,ts,jsx,tsx,md,mdx}",
   ],
   theme: {
     extend: {

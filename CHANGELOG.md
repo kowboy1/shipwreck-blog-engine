@@ -4,6 +4,37 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-04-29
+
+Patch release fixing every gap Nyxi found during the first end-to-end clean integration of v0.3.0 into wollongong-weather. The visual regression alone (page renderers stripped of utility classes) made v0.3.0 unusable for new sites — this release is the actual usable v0.3.0.
+
+### Fixed
+
+- **Critical visual regression: Tailwind preset wasn't scanning the engine's `pages/**` directory.** The v0.3.0 page-renderer move added `PostPage.astro` and `ListingPage.astro` to `@shipwreck/blog-core/src/pages/`, but the shared Tailwind preset only had a content path for `src/components/**`. Result: every utility class used at the page level (`max-w-7xl`, `max-w-3xl`, `text-4xl`, `font-heading`, `not-prose`, `mt-5`, `prose-lg`, etc.) got tree-shaken out, leaving freshly-integrated sites with completely unstyled blog pages. Fixed by adding `pages/**` to the preset's content array.
+
+- **`preparePostPageData()` had over-strict types for `getEntry`/`render`** — consumer site `[...slug].astro` files needed `as any` casts to compile. Loosened to accept Astro's actual `astro:content` runtime types directly.
+
+- **`@shipwreck/blog-theme-default/tailwind-preset` had no `.d.ts`** — consumer sites needed a hand-rolled `env.d.ts` module declaration. Added `tailwind-preset.d.ts` and proper `types` exports in package.json.
+
+- **JSON-LD `<script>` tag in BaseLayout missing `is:inline`** — generated Astro check hints. Added.
+
+- **Demo-site `package.json` used `*` version specifiers** that resolve to npm 404s because the engine isn't published. Switched to `file:../../packages/...` (works in monorepo) with skill instructions to adjust the path for per-site repos until npm publish.
+
+### Added
+
+- **Local-dev integration mode** documented in the integration skill. Three deploy modes now: A (full production), B (local-dev only), C (hand-off to external host). Skill picks the path early so phases align with the user's actual situation.
+
+- Skill Phase 1 now explicitly walks through fixing engine dep paths when copying demo-site into a sibling per-site repo (was implicit before; Nyxi had to figure it out).
+
+### Migration from 0.3.0
+
+Existing 0.3.0 sites need to:
+1. `npm update @shipwreck/blog-core @shipwreck/blog-theme-default` (or pull latest local file dep)
+2. `rm -rf _blog/dist _blog/.astro` (force a clean Tailwind rebuild)
+3. `npm run build`
+
+That's it. No template changes required.
+
 ## [0.3.0] - 2026-04-29
 
 ### Page renderers moved into the package

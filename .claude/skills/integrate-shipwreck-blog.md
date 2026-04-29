@@ -28,6 +28,55 @@ If any are missing, ask. Don't guess.
 
 ---
 
+## Choose a deploy mode FIRST (before any phases)
+
+The integration runs in one of three modes. Pick before starting Phase 1 — they branch the runbook in different places.
+
+### Mode A — Full production deploy (default)
+
+The site lives on a real production server (Prem3, Prem4, cheap shared cPanel, anywhere with SSH/SFTP/HTTP). Self-update via `shipwreck-updater.php` + cron pulling from a per-site GitHub repo's releases.
+
+**Use when:** integrating into a live client site that's actually deployed somewhere we control or have access to.
+
+**Includes:** all 9 phases. Cloudflare zone setup, GH per-site repo, GH Actions, host-side updater install, cron, Uptime Kuma monitor.
+
+### Mode B — Local-dev integration (no remote, no Cloudflare, no GH workflow)
+
+The site is being developed locally — usually on `/home/rick/projects/<site>/`, often served via a Cloudflare Tunnel or local dev server (e.g. `python3 -m http.server`). No real production deploy yet. We just need the blog rendering correctly inside the local site so the user can iterate before going live.
+
+**Use when:** the user says "set this up locally", "just integrate it for dev", "I'll deploy later", or the host site isn't on a production server yet.
+
+**Skip these phases:**
+- Phase 1's `gh repo create` step — keep the per-site source as a local directory, no remote
+- Phase 6's host-side installer (`install-updater.sh`) — no remote host to install on
+- Phase 6's "trigger first update via curl" step
+- Phase 8's Uptime Kuma monitor
+
+**Replace with:**
+- Build the blog source locally with `npm run build`
+- Copy `_blog/dist/` to `<host-site>/blog/` (or whatever subpath the local server serves from)
+- Document the build-and-copy command in the per-site repo's README so it's reproducible
+
+**Run mostly normally:**
+- Phases 2 (tokens), 3 (SiteShell), 4 (CTAs), 5 (visual verification), 7 (host wiring — footer link, optional nav, robots.txt) all still apply
+- Phase 8 still register in `.shipwreck/sites.json` but with `deploy.method: "manual"` and a note that it's local-dev only
+
+When the site is ready to go live later, re-enter the runbook at Phase 6 (production deploy) — the per-site source is already done, just needs a GH repo + the updater install.
+
+### Mode C — Hand-off / external host
+
+The site is on a third-party host we don't control (client's own server, GoDaddy, etc.). We build the dist tarball; the client uploads it.
+
+**Use when:** the user explicitly says "we don't have access to that host" or the integration is for a site outside our hosting fleet.
+
+**Phases:** 1, 2, 3, 4, 5, 7 (host wiring done by client), 8 (registry only, no monitor). Phase 6 produces the tarball and a one-page upload-instructions doc; the client takes it from there.
+
+---
+
+If unclear which mode applies, **ask the user**: "Is this going to a production server we'll deploy to, or just local dev for now?"
+
+---
+
 ## Critical model concept (read before Phase 1)
 
 Two repos, kept separate:
@@ -49,17 +98,35 @@ mkdir -p ~/projects/<site-name>-blog
 cd ~/projects/<site-name>-blog
 git init -b main
 
-# Copy the demo-site as the starter
-cp -r <path-to>/shipwreck-blog-engine/examples/demo-site/* .
-cp -r <path-to>/shipwreck-blog-engine/examples/demo-site/.* . 2>/dev/null || true
+# Copy the demo-site contents into _blog/ (the workflow + skill assume this layout)
+mkdir -p _blog
+cp -r <path-to>/shipwreck-blog-engine/examples/demo-site/. _blog/
 
-# Copy the per-site build workflow template
+# Copy the per-site build workflow template (Mode A only — skip in Mode B local-dev)
 mkdir -p .github/workflows
 cp <path-to>/shipwreck-blog-engine/templates/site-blog-build.yml .github/workflows/blog-build.yml
-
-# Move the site source into _blog/ (the workflow assumes this layout)
-# (the demo-site's contents become the _blog/ contents — check current shape)
 ```
+
+### Fix engine package dep specifiers
+
+The demo-site's `_blog/package.json` ships with `file:../../packages/...` paths that resolve correctly inside the engine monorepo, but **break in a per-site sibling repo**. Update them to point at the local engine checkout:
+
+```diff
+   "dependencies": {
+-    "@shipwreck/blog-core": "file:../../packages/blog-core",
+-    "@shipwreck/blog-theme-default": "file:../../packages/blog-theme-default",
++    "@shipwreck/blog-core": "file:../../shipwreck-blog-engine/packages/blog-core",
++    "@shipwreck/blog-theme-default": "file:../../shipwreck-blog-engine/packages/blog-theme-default",
+```
+
+Once the engine is published to npm (or a private GitHub Packages registry), switch these to versioned specifiers:
+
+```json
+"@shipwreck/blog-core": "^0.3.0",
+"@shipwreck/blog-theme-default": "^0.3.0",
+```
+
+(Until then, the `file:` path is the canonical install method and works for both local dev and CI builds where the engine repo is checked out alongside.)
 
 **Edit `_blog/site.config.ts`** with the user's inputs:
 

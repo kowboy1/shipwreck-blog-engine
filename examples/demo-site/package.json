@@ -10,8 +10,8 @@
     "typecheck": "astro check"
   },
   "dependencies": {
-    "@shipwreck/blog-core": "*",
-    "@shipwreck/blog-theme-default": "*",
+    "@shipwreck/blog-core": "file:../../packages/blog-core",
+    "@shipwreck/blog-theme-default": "file:../../packages/blog-theme-default",
     "@astrojs/mdx": "^4.0.0",
     "@astrojs/rss": "^4.0.0",
     "@astrojs/sitemap": "^3.2.0",

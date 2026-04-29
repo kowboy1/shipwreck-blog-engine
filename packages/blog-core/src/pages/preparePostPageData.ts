@@ -37,24 +37,31 @@ interface AuthorEntry {
   data: AuthorRecord
 }
 
+/**
+ * Astro's content collection helpers (`getEntry` / `render`) come from a
+ * per-project virtual module (`astro:content`) we can't import from this
+ * package. We accept them as deliberately-loose function types so consumer
+ * sites can pass them in directly without needing `as any` casts.
+ *
+ * Practical note: the runtime shapes are stable across Astro 4/5. The loose
+ * typing is purely about avoiding cross-project type-identity friction at
+ * the call site.
+ */
+type GetEntryFn = (...args: any[]) => Promise<any>
+type RenderFn = (entry: any) => Promise<{
+  Content: any
+  headings: Array<{ depth: number; slug: string; text: string }>
+  remarkPluginFrontmatter?: Record<string, unknown>
+}>
+
 export interface PreparePostPageDataInput {
   post: PostEntry
   all: PostEntry[]
   siteConfig: SiteConfig
-  /**
-   * Astro's `getEntry` from `astro:content`. Pass it in as a function.
-   * Used to resolve author records.
-   */
-  getEntry: (collection: string, id: string) => Promise<AuthorEntry | undefined>
-  /**
-   * Astro's `render` from `astro:content`. Pass it in as a function.
-   * Used to compile the post body and extract headings + frontmatter.
-   */
-  render: (entry: PostEntry) => Promise<{
-    Content: unknown
-    headings: Array<{ depth: number; slug: string; text: string }>
-    remarkPluginFrontmatter: Record<string, unknown> | undefined
-  }>
+  /** Astro's `getEntry` from `astro:content`. Used to resolve author records. */
+  getEntry: GetEntryFn
+  /** Astro's `render` from `astro:content`. Used to compile the post body. */
+  render: RenderFn
 }
 
 export interface PostPageData {
@@ -94,7 +101,9 @@ export async function preparePostPageData(
   const { Content, headings, remarkPluginFrontmatter } = await render(post)
 
   const authorIds = getPostAuthorIds(post.data)
-  const resolved = await Promise.all(authorIds.map((id) => getEntry("authors", id)))
+  const resolved: Array<AuthorEntry | undefined> = await Promise.all(
+    authorIds.map((id) => getEntry("authors", id) as Promise<AuthorEntry | undefined>),
+  )
   const authors = resolved.filter((e): e is AuthorEntry => Boolean(e))
 
   const articleAuthors: ArticleAuthor[] = authors.map(({ data }) => ({
