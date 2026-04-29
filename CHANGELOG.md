@@ -8,6 +8,29 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.8] - 2026-04-29
+
+Adds standardized integration timing capture. Triggered by Nyxi's first successfully-procedural integration (3m 42s manually clocked) — the user wanted timing as a standard data point per install.
+
+### Added
+
+- **`attest-start` subcommand** on doctor:
+  ```bash
+  npx shipwreck-blog-doctor attest-start
+  ```
+  Records the integration start time in `.shipwreck-integration-state.json`. Idempotent — running twice doesn't reset.
+- **Duration line in `print-completion` stdout**: `- Time taken: 3m 42s (222s)` appears in the audit-trail block when `integrationStartedAt` is in the state file (i.e., when `attest-start` was run at the beginning).
+- **New Phase -1 in the integration skill**: a 5-second pre-Phase-0 step that just runs `attest-start`. Optional in the sense that if it's skipped, only the duration line is omitted — everything else still works. But it's free and gives every install a built-in timing benchmark.
+- **Same step added to OpenClaw runtime skill** (`~/.openclaw/skills/shipwreck-final-gate/SKILL.md`) as the first action before the completion contract.
+
+### Why this is additive (no contract version bump)
+
+This is purely metadata enrichment — adds a new optional state file field, a new optional output line. Doesn't change any required attestations, doesn't change the completion gate semantics. `COMPLETION_CONTRACT_VERSION` stays at `1`. Runtime layer needs no review.
+
+### Migration
+
+None. Existing 0.3.7 installs work as-is. The new timing is opt-in by virtue of being run at the start; old state files lacking `integrationStartedAt` simply produce print-completion stdout without the duration line.
+
 ## [0.3.7] - 2026-04-29
 
 Adopts Nyxi's governance recommendation from `FEEDBACK-FOR-CLAUDE-final-gate-governance.md`. The runtime layer (OpenClaw-side AGENTS.md + final-gate skill) and the project layer (engine repo skill) are explicitly separated by a versioned contract. Runtime layer stays stable across engine bumps unless the completion contract itself changes.

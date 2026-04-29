@@ -72,6 +72,21 @@ Don't ask the user about deploy methods to the blog separately — there is no s
 
 ---
 
+## Phase -1 — Mark integration start (5 seconds)
+
+Before any other work, once you've confirmed the inputs and you're about to begin Phase 0, run this from anywhere:
+
+```bash
+cd <site-repo>/_blog 2>/dev/null || cd <site-repo>   # whichever exists
+npx shipwreck-blog-doctor attest-start
+```
+
+This records the integration start time in `.shipwreck-integration-state.json`. `print-completion` at the end will include the total elapsed time in the audit-trail block. Idempotent — running twice doesn't reset the timer.
+
+If this step is skipped, the duration line just won't appear in print-completion (everything else still works). But it's free, captures useful data, and gives the user a per-install timing benchmark — do it.
+
+---
+
 ## Phase 0 — Establish the site repo (skip if one already exists)
 
 > **Precondition:** All inputs collected.

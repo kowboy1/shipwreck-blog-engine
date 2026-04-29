@@ -126,13 +126,33 @@ function blankState() {
   return {
     engineVersion: null,
     siteName: null,
+    integrationStartedAt: null, // ISO timestamp set by attest-start
     phase9: { asked: false, ts: null, answers: null },
     feedback: { status: null, file: null, reason: null, ts: null },
     navLink: { decision: null, ts: null }, // "approved" | "declined" | null
   }
 }
 
+function formatDuration(ms) {
+  const totalSec = Math.round(ms / 1000)
+  const min = Math.floor(totalSec / 60)
+  const sec = totalSec % 60
+  if (min === 0) return `${sec}s`
+  return `${min}m ${sec.toString().padStart(2, "0")}s (${totalSec}s)`
+}
+
 // ---------- subcommands ----------
+
+function attestStart() {
+  const state = readState() ?? blankState()
+  if (state.integrationStartedAt) {
+    console.log(`✓ Integration start already recorded at ${state.integrationStartedAt}. Not overwriting.`)
+    return
+  }
+  state.integrationStartedAt = new Date().toISOString()
+  writeState(state)
+  console.log(`✓ Integration started at ${state.integrationStartedAt}. Duration will be reported in print-completion stdout.`)
+}
 
 function attestPhase9(args) {
   if (args.length === 0) {
@@ -306,6 +326,17 @@ completion message to emit.
       ? `Nav link: user declined; footer-only`
       : `Nav link: not asked (FAIL — should not have reached here)`
 
+  // Duration: only emit if attest-start was run at the beginning of the
+  // integration (otherwise we don't have a reliable start time).
+  let durationLine = ""
+  if (state.integrationStartedAt) {
+    const startMs = new Date(state.integrationStartedAt).getTime()
+    const elapsedMs = Date.now() - startMs
+    if (elapsedMs > 0) {
+      durationLine = `\n- Time taken: ${formatDuration(elapsedMs)}`
+    }
+  }
+
   // The audit-trail block. This is the ONLY valid completion message format.
   // The completion_contract_version line is parsed by the OpenClaw runtime
   // skill to confirm the engine is producing compatible output. Don't remove
@@ -320,13 +351,14 @@ completion message to emit.
 ${phase9Summary}
 - ${navLine}
 - ${feedbackLine}
-- Phase 9 attested at: ${state.phase9.ts}
+- Phase 9 attested at: ${state.phase9.ts}${durationLine}
 `)
   process.exit(0)
 }
 
 // ---------- subcommand dispatch (after all helpers are defined) ----------
 
+if (SUBCOMMAND === "attest-start") { attestStart(); process.exit(0) }
 if (SUBCOMMAND === "attest-phase9") { attestPhase9(argv.slice(1)); process.exit(0) }
 if (SUBCOMMAND === "attest-feedback") { attestFeedback(argv.slice(1)); process.exit(0) }
 if (SUBCOMMAND === "attest-nav-link") { attestNavLink(argv.slice(1)); process.exit(0) }
