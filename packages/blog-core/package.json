@@ -1,6 +1,6 @@
 {
   "name": "@shipwreck/blog-core",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Core engine for Shipwreck Blog — schema, components, SEO helpers",
   "type": "module",
   "main": "./src/index.ts",
@@ -9,7 +9,8 @@
     "./schemas": "./src/schemas/index.ts",
     "./seo": "./src/seo/index.ts",
     "./utils": "./src/utils/index.ts",
-    "./components/*": "./src/components/*"
+    "./components/*": "./src/components/*",
+    "./remark/*": "./src/remark/*"
   },
   "files": [
     "src"

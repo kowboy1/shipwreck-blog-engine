@@ -4,12 +4,11 @@ import type { Post } from "../schemas/post.js"
 interface Props {
   post: { id: string; data: Post }
   basePath: string
-  defaultImage?: string
 }
 
-const { post, basePath, defaultImage } = Astro.props
+const { post, basePath } = Astro.props
 const href = `${basePath.replace(/\/$/, "")}/${post.id}/`
-const image = post.data.featuredImage ?? defaultImage
+const image = post.data.featuredImage
 const altText = post.data.featuredImageAlt ?? post.data.title
 ---
 

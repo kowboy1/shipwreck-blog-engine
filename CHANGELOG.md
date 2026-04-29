@@ -4,6 +4,49 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-29
+
+### Fixed (out-of-the-box presentation)
+
+Three root-cause bugs were making fresh integrations look broken. All fixed in the engine so consumer sites get a usable result without per-site patches:
+
+- **Tailwind preset now self-registers engine component sources.** Previously each consumer site had to add `"../../packages/blog-core/src/components/*.astro"` to their `tailwind.config.ts` content array — a monorepo-relative path that silently failed on installed packages. As a result, every utility class used inside engine components (including `lg:hidden`, `hidden lg:block`, sticky / max-h, ring, rounded-full, etc.) was tree-shaken out, breaking the ToC at desktop width and many other components. The shared preset (`@shipwreck/blog-theme-default/tailwind-preset`) now includes `./node_modules/@shipwreck/blog-core/src/components/**/*.{astro,...}` in its `content` array, so consumer sites only need their own `./src/**/*` path.
+- **OG image is no longer used as an in-page hero fallback.** `[...slug].astro` and `PostCard` previously fell back to `siteConfig.seo.defaultFeaturedImage` for the article hero and card thumbnails — which on most sites is the OG/brand banner. The result was a giant brand banner above every article and inside every "More articles" card. Hero now only renders when the post explicitly sets `featuredImage`. PostCard / RelatedPosts no longer accept a `defaultImage` prop.
+- **Duplicate H1 stripped automatically.** Authors who started MDX bodies with `# Same Title As Frontmatter` produced two H1s on the rendered page (layout renders one from frontmatter; content adds another). New `remarkStripDuplicateH1` plugin in `@shipwreck/blog-core/remark/strip-duplicate-h1.mjs` removes the leading H1 from MDX when its text matches the frontmatter `title`. Wired into the demo-site `astro.config.ts`.
+
+### Added
+- `@shipwreck/blog-core/remark/strip-duplicate-h1` — remark plugin (see Fixed above)
+- `./remark/*` export entry in `@shipwreck/blog-core` package.json
+
+### Changed
+- `PostCard` no longer accepts `defaultImage` prop — text-only card when post has no `featuredImage`
+- `RelatedPosts` no longer accepts `defaultImage` prop
+- `TagList` chips redesigned: pill shape, uppercase tracking, no `#` prefix, accent hover
+- `AuthorBio` tightened: smaller avatar (64 → 72 retained at 64), tighter padding, `mt-10` (was `mt-12`)
+- All demo-site listing pages (`index.astro`, `tags/[tag].astro`, `categories/[category].astro`, `authors/[author].astro`, `page/[page].astro`) no longer pass `defaultImage` to `PostCard`
+- Demo-site `tailwind.config.ts` simplified — engine component path now in shared preset
+
+### Migration (consumers upgrading from 0.1.x)
+
+1. Bump `@shipwreck/blog-core` and `@shipwreck/blog-theme-default` to `0.2.0`
+2. Remove the engine-components content path from your `tailwind.config.ts`:
+   ```diff
+     content: [
+       "./src/**/*.{astro,html,js,ts,jsx,tsx,md,mdx}",
+   -   "./node_modules/@shipwreck/blog-core/src/components/*.astro",
+     ],
+   ```
+   The shared preset adds it now.
+3. Remove `defaultImage={siteConfig.seo.defaultFeaturedImage}` props from any `<PostCard>` / `<RelatedPosts>` usages
+4. Remove the `?? siteConfig.seo.defaultFeaturedImage` fallback on `heroImage` in your `[...slug].astro`
+5. Add the H1-stripper to your `astro.config.ts`:
+   ```ts
+   import { remarkStripDuplicateH1 } from "@shipwreck/blog-core/remark/strip-duplicate-h1.mjs"
+   // ...
+   markdown: { remarkPlugins: [remarkReadingTime, remarkStripDuplicateH1] }
+   ```
+6. Rebuild
+
 ## [0.1.2] - 2026-04-28
 
 ### Fixed

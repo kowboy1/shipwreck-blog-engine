@@ -13,17 +13,17 @@ interface Props {
 const { author, href, fallbackImage } = Astro.props
 ---
 
-<aside class="not-prose mt-12 flex items-start gap-4 rounded-card border border-border bg-bg/60 p-6 backdrop-blur">
-  <AuthorAvatar author={author} size={72} fallbackImage={fallbackImage} />
-  <div class="min-w-0">
-    <p class="font-heading text-lg font-semibold text-primary">
+<aside class="not-prose mt-10 flex items-start gap-4 rounded-card border border-border bg-bg/40 p-5 backdrop-blur sm:p-6">
+  <AuthorAvatar author={author} size={64} fallbackImage={fallbackImage} />
+  <div class="min-w-0 flex-1">
+    <p class="font-heading text-base font-semibold text-primary sm:text-lg">
       {href ? (
         <a href={href} class="hover:text-accent">{author.name}</a>
       ) : (
         <span>{author.name}</span>
       )}
     </p>
-    {author.bio && <p class="mt-1 text-sm text-muted">{author.bio}</p>}
+    {author.bio && <p class="mt-1 text-sm leading-relaxed text-muted">{author.bio}</p>}
     <div class="mt-2 flex flex-wrap gap-3 text-sm">
       {author.url && <a href={author.url} class="text-accent hover:underline">Website</a>}
       {author.twitter && (

@@ -81,7 +81,10 @@ const crumbs = [
 const wordCount = (remarkPluginFrontmatter as { wordCount?: number } | undefined)?.wordCount
 const readingLabel = wordCount ? readingTimeLabel("x ".repeat(wordCount)) : undefined
 
-const heroImage = post.data.featuredImage ?? siteConfig.seo.defaultFeaturedImage
+// Only render an in-page hero when the post explicitly sets one.
+// We deliberately do NOT fall back to siteConfig.seo.defaultFeaturedImage —
+// that's the OG image (brand banner), which looks wrong as an article hero.
+const heroImage = post.data.featuredImage
 ---
 
 <BaseLayout meta={meta} jsonLd={jsonLd}>
@@ -185,7 +188,6 @@ const heroImage = post.data.featuredImage ?? siteConfig.seo.defaultFeaturedImage
     <RelatedPosts
       posts={bottomGridPosts}
       basePath={siteConfig.blogBasePath}
-      defaultImage={siteConfig.seo.defaultFeaturedImage}
       title="More articles"
       layout="grid"
     />

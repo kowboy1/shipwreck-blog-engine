@@ -6,7 +6,6 @@ interface Props {
   posts: Array<{ id: string; data: Post }>
   basePath: string
   title?: string
-  defaultImage?: string
   /** "grid" = 3-up horizontal at md+ (default). "stack" = vertical stack. */
   layout?: "grid" | "stack"
 }
@@ -15,7 +14,6 @@ const {
   posts,
   basePath,
   title = "Related articles",
-  defaultImage,
   layout = "grid",
 } = Astro.props
 ---
@@ -31,7 +29,7 @@ const {
       ]}
     >
       {posts.map((post) => (
-        <PostCard post={post} basePath={basePath} defaultImage={defaultImage} />
+        <PostCard post={post} basePath={basePath} />
       ))}
     </div>
   </section>
