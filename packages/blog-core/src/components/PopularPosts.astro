@@ -65,8 +65,11 @@ if (posts.length === 0) return Astro.response
                 src={image}
                 alt={altText}
                 aria-hidden={post.data.featuredImage ? undefined : "true"}
-                class="h-12 w-12 shrink-0 rounded-sm object-cover"
+                width="48"
+                height="48"
                 loading="lazy"
+                decoding="async"
+                class="h-12 w-12 shrink-0 rounded-sm object-cover"
               />
             )}
             <span class="min-w-0 flex-1">

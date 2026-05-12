@@ -146,6 +146,10 @@ const layout = siteConfig.layout ?? {}
           <img
             src={heroImage}
             alt={post.data.featuredImageAlt ?? post.data.title}
+            width={post.data.featuredImageWidth ?? 1200}
+            height={post.data.featuredImageHeight ?? 675}
+            decoding="async"
+            fetchpriority="high"
             class="mt-8 aspect-[16/9] w-full rounded-card object-cover"
           />
         )}

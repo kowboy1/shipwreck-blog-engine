@@ -1,4 +1,5 @@
 import type { Post, SiteConfig, FaqItem } from "../schemas/index.js"
+import { DEFAULT_OG_IMAGE_WIDTH, DEFAULT_OG_IMAGE_HEIGHT } from "./meta.js"
 
 export interface ArticleAuthor {
   name: string
@@ -10,12 +11,16 @@ export function articleSchema(args: {
   siteConfig: SiteConfig
   url: string
   authors?: ArticleAuthor[]
+  /** Word count from the remark word-count plugin (preparePostPageData passes
+   *  this through). Emitted into Schema.org `wordCount` — used by voice
+   *  search and content-quality signals. */
+  wordCount?: number
   /** @deprecated use `authors` */
   authorName?: string
   /** @deprecated use `authors` */
   authorUrl?: string
 }) {
-  const { post, siteConfig, url, authors, authorName, authorUrl } = args
+  const { post, siteConfig, url, authors, wordCount, authorName, authorUrl } = args
 
   const authorList: ArticleAuthor[] =
     authors && authors.length > 0
@@ -35,21 +40,47 @@ export function articleSchema(args: {
             ...(a.url ? { url: a.url } : {}),
           }))
 
+  // image emitted as an ImageObject (with dimensions) when we have one —
+  // Google's structured-data validator prefers this over a bare URL string.
+  const imageUrl = post.ogImage ?? post.featuredImage ?? siteConfig.seo.defaultOgImage
+  const imageW = post.featuredImageWidth ?? DEFAULT_OG_IMAGE_WIDTH
+  const imageH = post.featuredImageHeight ?? DEFAULT_OG_IMAGE_HEIGHT
+  const image = imageUrl
+    ? { "@type": "ImageObject", url: imageUrl, width: imageW, height: imageH }
+    : undefined
+
+  // Publisher logo as a typed ImageObject. Dimensions emitted only when set
+  // on siteConfig — Google's validator flags missing dims as a warning.
+  const logoUrl = siteConfig.brand.logoUrl
+  const logoW = siteConfig.brand.logoWidth
+  const logoH = siteConfig.brand.logoHeight
+  const publisherLogo = logoUrl
+    ? {
+        "@type": "ImageObject",
+        url: logoUrl,
+        ...(logoW ? { width: logoW } : {}),
+        ...(logoH ? { height: logoH } : {}),
+      }
+    : undefined
+
   return {
     "@context": "https://schema.org",
     "@type": post.articleType ?? "BlogPosting",
     headline: post.metaTitle ?? post.title,
     description: post.metaDescription ?? post.excerpt,
-    image: post.ogImage ?? post.featuredImage ?? siteConfig.seo.defaultOgImage,
+    ...(image ? { image } : {}),
+    /** dateCreated == datePublished for our model (we don't track creation
+     *  separately from first publish). Still useful as a Schema.org signal. */
+    dateCreated: post.publishDate.toISOString(),
     datePublished: post.publishDate.toISOString(),
     dateModified: (post.updatedDate ?? post.publishDate).toISOString(),
+    inLanguage: siteConfig.seo.locale,
+    ...(typeof wordCount === "number" && wordCount > 0 ? { wordCount } : {}),
     author: authorJsonLd,
     publisher: {
       "@type": "Organization",
       name: siteConfig.brand.organizationName,
-      ...(siteConfig.brand.logoUrl
-        ? { logo: { "@type": "ImageObject", url: siteConfig.brand.logoUrl } }
-        : {}),
+      ...(publisherLogo ? { logo: publisherLogo } : {}),
     },
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
   }
@@ -87,5 +118,48 @@ export function faqSchema(items: FaqItem[]) {
       name: item.question,
       acceptedAnswer: { "@type": "Answer", text: item.answer },
     })),
+  }
+}
+
+/**
+ * CollectionPage schema for blog index + tag / category / author archive
+ * pages. Tells crawlers the page is a curated list of items (not a generic
+ * web page or an article) — improves SERP-type classification.
+ *
+ * The `mainEntity` is an ItemList referencing every listed post by URL,
+ * giving crawlers a structured representation of the archive's contents
+ * separate from the visual card markup.
+ */
+export function collectionPageSchema(args: {
+  name: string
+  description?: string
+  url: string
+  siteConfig: SiteConfig
+  posts: Array<{ id: string; data: Pick<Post, "title"> }>
+}) {
+  const { name, description, url, siteConfig, posts } = args
+  const base = siteConfig.blogBasePath.replace(/\/$/, "")
+  return {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name,
+    ...(description ? { description } : {}),
+    url,
+    inLanguage: siteConfig.seo.locale,
+    isPartOf: {
+      "@type": "WebSite",
+      name: siteConfig.siteName,
+      url: siteConfig.baseUrl,
+    },
+    mainEntity: {
+      "@type": "ItemList",
+      numberOfItems: posts.length,
+      itemListElement: posts.map((p, i) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        url: new URL(`${base}/${p.id}/`, siteConfig.baseUrl).toString(),
+        name: p.data.title,
+      })),
+    },
   }
 }

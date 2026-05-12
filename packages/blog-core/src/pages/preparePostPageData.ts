@@ -118,10 +118,46 @@ export async function preparePostPageData(
     ...(data.url ? { url: data.url } : {}),
   }))
 
-  const meta = buildPostMeta({ post: post.data, siteConfig, url })
+  // Reading time / word count (extracted here so it can feed both the byline
+  // label AND the Schema.org wordCount field). remark-reading-time plugin
+  // attaches wordCount to remarkPluginFrontmatter at build time.
+  const wordCount = (
+    remarkPluginFrontmatter as { wordCount?: number } | undefined
+  )?.wordCount
+  const readingLabel = wordCount
+    ? readingTimeLabel("x ".repeat(wordCount))
+    : undefined
+
+  // Primary author's twitter handle → twitter:creator (separate from
+  // twitter:site which is the org account).
+  const primaryAuthorTwitter = authors[0]?.data?.twitter
+
+  const meta = buildPostMeta({
+    post: post.data,
+    siteConfig,
+    url,
+    ...(primaryAuthorTwitter ? { authorTwitter: primaryAuthorTwitter } : {}),
+  })
+
+  // LCP preload hint for the hero image — emits
+  // <link rel="preload" as="image" fetchpriority="high" href="...">
+  // in <head>. Tells the browser to start fetching the hero before the
+  // HTML parser would otherwise discover it via the <img> tag.
+  const heroImage = post.data.featuredImage
+  if (heroImage) {
+    const links = meta.links ?? []
+    links.push({ rel: "preload", as: "image", href: heroImage, fetchpriority: "high" })
+    meta.links = links
+  }
 
   const jsonLd: object[] = [
-    articleSchema({ post: post.data, siteConfig, url, authors: articleAuthors }),
+    articleSchema({
+      post: post.data,
+      siteConfig,
+      url,
+      authors: articleAuthors,
+      ...(typeof wordCount === "number" ? { wordCount } : {}),
+    }),
     breadcrumbSchema([
       { name: "Home", url: siteConfig.baseUrl },
       { name: "Blog", url: blogUrl },
@@ -164,14 +200,6 @@ export async function preparePostPageData(
     popularResult.source === "popularity-file" && popularity.data
       ? popularity.data.window
       : undefined
-
-  // Reading time
-  const wordCount = (
-    remarkPluginFrontmatter as { wordCount?: number } | undefined
-  )?.wordCount
-  const readingLabel = wordCount
-    ? readingTimeLabel("x ".repeat(wordCount))
-    : undefined
 
   const crumbs: Array<{ name: string; url?: string }> = [
     { name: "Home", url: siteConfig.baseUrl },

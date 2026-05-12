@@ -3,11 +3,13 @@ import siteConfig from "../../site.config"
 
 export async function GET(_context: APIContext) {
   const sitemapUrl = new URL(`${siteConfig.blogBasePath}/sitemap-index.xml`, siteConfig.baseUrl).toString()
+  const imageSitemapUrl = new URL(`${siteConfig.blogBasePath}/image-sitemap.xml`, siteConfig.baseUrl).toString()
   const body = [
     "User-agent: *",
     "Allow: /",
     "",
     `Sitemap: ${sitemapUrl}`,
+    `Sitemap: ${imageSitemapUrl}`,
     "",
   ].join("\n")
   return new Response(body, {

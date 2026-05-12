@@ -13,6 +13,7 @@ import {
   buildPostMeta,
   breadcrumbSchema,
   organizationSchema,
+  collectionPageSchema,
   type MetaTags,
 } from "../seo/index.js"
 import { buildPostsManifest, buildFilterFacets, type PostsManifest, type FilterFacets } from "../api/posts-manifest.js"
@@ -76,13 +77,17 @@ function buildListingMeta(input: {
   url: string
   siteConfig: SiteConfig
   pagination?: { current: number; total: number; baseUrl: string }
+  /** When true (thin-archive policy hit), emit robots="noindex,follow". */
+  noindex?: boolean
 }): MetaTags {
   const meta = buildPostMeta({
     post: virtualPost(input.title, input.description),
     siteConfig: input.siteConfig,
     url: input.url,
   })
-  const links: Array<{ rel: string; href: string }> = []
+  // buildPostMeta already populates links with the RSS rel=alternate.
+  // Append rel=prev/next for paginated listings (Bing/Yandex still use these).
+  const links = [...(meta.links ?? [])]
   if (input.pagination) {
     const { current, total, baseUrl } = input.pagination
     const base = baseUrl.replace(/\/$/, "")
@@ -95,12 +100,22 @@ function buildListingMeta(input: {
       links.push({ rel: "next", href: new URL(nextHref, input.siteConfig.baseUrl).toString() })
     }
   }
-  // Listing pages are "website" not "article"
+
   return {
     ...meta,
     og: { ...meta.og, type: "website" },
-    ...(links.length > 0 ? { links } : {}),
+    ...(input.noindex ? { robots: "noindex,follow" } : {}),
+    links,
   }
+}
+
+/** Apply thin-archive noindex policy: returns true if this archive should be
+ *  de-indexed (post count below the configured threshold AND policy enabled). */
+function shouldNoindexArchive(siteConfig: SiteConfig, postCount: number): boolean {
+  const thin = siteConfig.listing?.thinArchive
+  if (!thin || thin.noindex !== true) return false
+  const threshold = thin.threshold ?? 3
+  return postCount < threshold
 }
 
 export function prepareIndexPage(input: {
@@ -149,7 +164,16 @@ export function prepareIndexPage(input: {
         ? { ...pagination, baseUrl: siteConfig.blogBasePath }
         : undefined,
     }),
-    jsonLd: organizationSchema(siteConfig),
+    jsonLd: [
+      organizationSchema(siteConfig),
+      collectionPageSchema({
+        name: `${siteConfig.siteName} — ${title}`,
+        description,
+        url,
+        siteConfig,
+        posts: fullList,
+      }),
+    ],
     ...(filterManifest ? { filterManifest } : {}),
     ...(filterFacets ? { filterFacets } : {}),
     showFilters,
@@ -174,6 +198,7 @@ export function prepareTagPage(input: {
     { name: `#${tag}` },
   ]
 
+  const noindex = shouldNoindexArchive(siteConfig, posts.length)
   return {
     title: `#${tag}`,
     subtitle: `${posts.length} ${posts.length === 1 ? "post" : "posts"}`,
@@ -184,8 +209,18 @@ export function prepareTagPage(input: {
       description: `All posts tagged "${tag}" on ${siteConfig.siteName}`,
       url,
       siteConfig,
+      noindex,
     }),
-    jsonLd: breadcrumbSchema(crumbs.map((c) => ({ name: c.name, url: c.url ?? url }))),
+    jsonLd: [
+      breadcrumbSchema(crumbs.map((c) => ({ name: c.name, url: c.url ?? url }))),
+      collectionPageSchema({
+        name: `Posts tagged "${tag}" — ${siteConfig.siteName}`,
+        description: `All posts tagged "${tag}" on ${siteConfig.siteName}`,
+        url,
+        siteConfig,
+        posts,
+      }),
+    ],
   }
 }
 
@@ -207,6 +242,7 @@ export function prepareCategoryPage(input: {
     { name: category },
   ]
 
+  const noindex = shouldNoindexArchive(siteConfig, posts.length)
   return {
     title: category,
     subtitle: `${posts.length} ${posts.length === 1 ? "post" : "posts"}`,
@@ -217,8 +253,18 @@ export function prepareCategoryPage(input: {
       description: `All posts in the "${category}" category on ${siteConfig.siteName}`,
       url,
       siteConfig,
+      noindex,
     }),
-    jsonLd: breadcrumbSchema(crumbs.map((c) => ({ name: c.name, url: c.url ?? url }))),
+    jsonLd: [
+      breadcrumbSchema(crumbs.map((c) => ({ name: c.name, url: c.url ?? url }))),
+      collectionPageSchema({
+        name: `${category} — ${siteConfig.siteName}`,
+        description: `All posts in the "${category}" category on ${siteConfig.siteName}`,
+        url,
+        siteConfig,
+        posts,
+      }),
+    ],
   }
 }
 
@@ -242,6 +288,7 @@ export function prepareAuthorPage(input: {
     { name: displayName },
   ]
 
+  const noindex = shouldNoindexArchive(siteConfig, posts.length)
   return {
     title: displayName,
     crumbs,
@@ -252,7 +299,17 @@ export function prepareAuthorPage(input: {
       description: `Posts by ${displayName} on ${siteConfig.siteName}`,
       url,
       siteConfig,
+      noindex,
     }),
-    jsonLd: breadcrumbSchema(crumbs.map((c) => ({ name: c.name, url: c.url ?? url }))),
+    jsonLd: [
+      breadcrumbSchema(crumbs.map((c) => ({ name: c.name, url: c.url ?? url }))),
+      collectionPageSchema({
+        name: `${displayName} — ${siteConfig.siteName}`,
+        description: `Posts by ${displayName} on ${siteConfig.siteName}`,
+        url,
+        siteConfig,
+        posts,
+      }),
+    ],
   }
 }

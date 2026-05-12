@@ -15,6 +15,10 @@ const href = `${basePath.replace(/\/$/, "")}/${post.id}/`
 const image = post.data.featuredImage ?? (variant === "card" ? fallbackImage : undefined)
 const isFallback = !post.data.featuredImage && !!image
 const altText = post.data.featuredImageAlt ?? (isFallback ? "" : post.data.title)
+// Intrinsic dimensions for CLS prevention. Per-post override via frontmatter;
+// engine default is 1200x675 (16:9) which matches the card's aspect ratio.
+const imgWidth = post.data.featuredImageWidth ?? 1200
+const imgHeight = post.data.featuredImageHeight ?? 675
 
 const wrapperClass = variant === "list"
   ? "border-b border-border pb-6 last:border-b-0"
@@ -30,8 +34,11 @@ const wrapperClass = variant === "list"
             src={image}
             alt={altText}
             aria-hidden={isFallback ? "true" : undefined}
-            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            width={imgWidth}
+            height={imgHeight}
             loading="lazy"
+            decoding="async"
+            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
           />
         )}
       </div>
@@ -40,8 +47,11 @@ const wrapperClass = variant === "list"
         <img
           src={image}
           alt={altText}
-          class="mb-4 aspect-[16/9] w-full rounded-card object-cover"
+          width={imgWidth}
+          height={imgHeight}
           loading="lazy"
+          decoding="async"
+          class="mb-4 aspect-[16/9] w-full rounded-card object-cover"
         />
       )
     )}

@@ -8,6 +8,88 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.18] - 2026-05-12
+
+Closes the SEO audit gap — ships every automatable improvement from the haiku-driven technical-SEO review in one batch. Built post + listing HTML now carries: image dimensions for CLS, og:image:width/height/alt, twitter:image:alt + twitter:creator, Schema.org wordCount + inLanguage + dateCreated + ImageObject typed image, publisher logo dimensions, CollectionPage JSON-LD on archives, RSS rel=alternate everywhere, LCP preload hint for the hero image, image sitemap, robots.txt that advertises it, optional thin-archive noindex.
+
+### Added: image dimensions (CLS prevention)
+
+- `<PostPage>` hero `<img>` — `width`, `height` (from `post.featuredImageWidth/Height` or engine defaults 1200/675), `decoding="async"`, `fetchpriority="high"`.
+- `<PostCard>` (`variant="card"` and `"list"`) — same width/height/decoding wiring.
+- `<AuthorAvatar>` — `decoding="async"` added (width/height already present).
+- `<PopularPosts>` mini-cards — explicit `width="48" height="48" decoding="async"`.
+
+New optional post frontmatter:
+```yaml
+featuredImageWidth: 1600   # override engine default 1200
+featuredImageHeight: 900   # override engine default 675
+```
+Defaults reflect 16:9 at OG-recommended size.
+
+### Added: OG / Twitter meta enrichment
+
+`MetaTags.og` extended with optional `imageWidth`, `imageHeight`, `imageAlt`. `MetaTags.twitter` extended with optional `creator`. `buildPostMeta()` populates all four automatically:
+
+- `og:image:width` / `og:image:height` — from `featuredImageWidth/Height` or engine defaults.
+- `og:image:alt` — from `featuredImageAlt` (falls back to post title).
+- `twitter:image:alt` — mirrors `og:image:alt` (Twitter doesn't have its own field, but rendering parsers honour both).
+- `twitter:creator` — from primary author's `twitter` field (handle is auto-normalised — `@handle` or `handle` both accepted).
+
+### Added: extended `MetaLink` shape
+
+`MetaTags.links[]` now supports `type`, `as`, `fetchpriority`, `sizes`, `media`. Lets us emit:
+
+- `<link rel="preload" as="image" fetchpriority="high" href="…">` for LCP hero on post pages.
+- `<link rel="alternate" type="application/rss+xml" href="…">` for feed discovery — emitted on EVERY page (post + listing) so feed readers find the RSS regardless of entry point.
+
+`buildPostMeta()` auto-populates the RSS link; `preparePostPageData()` appends the LCP preload when a hero is set.
+
+### Added: Schema.org Article enrichment
+
+`articleSchema()` now emits:
+- `wordCount` — when remark provides it (it does for all MDX builds).
+- `inLanguage` — from `siteConfig.seo.locale`.
+- `dateCreated` — equal to `datePublished` for our content model (we don't track first-creation separately from first-publish).
+- `image` as a typed `ImageObject` with `width` + `height` (was a bare URL string) — Google Search Console structured-data report wants this.
+- `publisher.logo` as a typed `ImageObject` with `width`/`height` when `siteConfig.brand.logoWidth/Height` is set.
+
+### Added: new `collectionPageSchema()`
+
+Emits Schema.org `CollectionPage` JSON-LD on `/blog/`, `/blog/tags/X/`, `/blog/categories/X/`, `/blog/authors/X/`. Each schema includes:
+- `name`, `description`, `url`, `inLanguage`, `isPartOf` (`WebSite`)
+- `mainEntity` as an `ItemList` with every post on the page enumerated by URL + title
+
+Helps Google classify archives as curated lists (not generic web pages or articles) — improves SERP-type labelling.
+
+### Added: image sitemap
+
+New `buildImageSitemap()` helper at `@shipwreck/blog-core/api/image-sitemap` produces a valid `<urlset xmlns:image=…>` XML payload listing every published post URL with its `featuredImage` as a `<image:image>` entry. Per-site consumers add a 9-line endpoint at `src/pages/image-sitemap.xml.ts` (see demo). `robots.txt` template now references both sitemaps so Google discovers the image index automatically.
+
+### Added: optional thin-archive noindex policy
+
+New `siteConfig.listing.thinArchive: { noindex, threshold }` config (default off). When enabled, tag / category / author archive pages with fewer than `threshold` posts (default 3) emit `noindex,follow` meta robots. Trade-off: improves topical authority concentration; loses long-tail "site:domain + tag" combo discoverability — opt in deliberately.
+
+### Schema additions
+
+- `post.ts`: `featuredImageWidth?`, `featuredImageHeight?` (optional, default to engine constants when unset)
+- `site-config.ts`: `brand.logoWidth?`, `brand.logoHeight?`; `listing.thinArchive: { noindex?, threshold? }`
+
+### Integration test: 73/73 (16 new assertions)
+
+Covers every new surface — og:image:width/height/alt, twitter:image:alt, RSS rel=alternate (on post + index), LCP preload, wordCount + inLanguage + dateCreated + ImageObject in JSON-LD, CollectionPage on `/blog/` index, image sitemap content + robots reference, plus a "every `<img>` on a post page has explicit width + height + decoding" sweep that catches future regressions of CLS-prevention attributes.
+
+### Migration from 0.3.17
+
+Consumer per-site changes (all optional but recommended):
+
+1. **`src/layouts/BaseLayout.astro`** — extend the meta-link `<link>` map to spread `type`/`as`/`fetchpriority`/`sizes`/`media`, and add OG image dimensions + alt + Twitter creator. Diff visible in `examples/demo-site/src/layouts/BaseLayout.astro`.
+2. **`src/pages/image-sitemap.xml.ts`** — copy the demo endpoint (9 lines). Submit `/blog/image-sitemap.xml` to Google Search Console (one-off setup).
+3. **`src/pages/robots.txt.ts`** — add the second `Sitemap:` line for the image sitemap (~2 lines).
+4. Optional: set `siteConfig.brand.logoWidth/logoHeight` to silence the Schema.org publisher-logo dimension warning.
+5. Optional: enable `listing.thinArchive.noindex` if your site has many singleton tag pages.
+
+Without these consumer changes, nothing breaks — you just don't get the corresponding new headers / endpoints emitted.
+
 ## [0.3.17] - 2026-05-12
 
 Fixes "More articles" / "Related articles" cards rendering empty image slots when the listed posts have no `featuredImage`. The same posts on `/blog/` correctly fell back to `siteConfig.cards.fallbackImage`; the difference was a missing prop hand-off, not a parallel card implementation.

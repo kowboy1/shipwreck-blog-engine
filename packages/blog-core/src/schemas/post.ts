@@ -36,6 +36,11 @@ export const postSchema = z.object({
 
   featuredImage: z.string().optional(),
   featuredImageAlt: z.string().optional(),
+  /** Intrinsic image width in pixels. Used for `<img width=...>` (CLS prevention)
+   * and og:image:width / Schema.org ImageObject.width. Engine default 1200. */
+  featuredImageWidth: z.number().int().positive().optional(),
+  /** Intrinsic image height in pixels. Engine default 675 (16:9 against width 1200). */
+  featuredImageHeight: z.number().int().positive().optional(),
 
   metaTitle: z.string().max(70).optional(),
   metaDescription: z.string().max(170).optional(),

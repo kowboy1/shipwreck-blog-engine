@@ -8,6 +8,11 @@ export const siteConfigSchema = z.object({
   brand: z.object({
     organizationName: z.string(),
     logoUrl: z.string().optional(),
+    /** Logo intrinsic width in pixels — emitted into Schema.org publisher.logo.width.
+     *  Google's structured-data validator flags missing dimensions on publisher logos. */
+    logoWidth: z.number().int().positive().optional(),
+    /** Logo intrinsic height in pixels — emitted into Schema.org publisher.logo.height. */
+    logoHeight: z.number().int().positive().optional(),
     primaryColor: z.string().optional(),
     accentColor: z.string().optional(),
   }),
@@ -102,6 +107,21 @@ export const siteConfigSchema = z.object({
           /** Number of tag chips visible before the "See more" button hides the rest. */
           tagsVisibleLimit: z.number().int().positive().default(6),
           heading: z.string().default("Filter"),
+        })
+        .default({}),
+      /**
+       * Thin-archive de-indexing. When enabled, tag / category / author archive
+       * pages with fewer than `threshold` published posts emit `noindex,follow`
+       * meta robots — Google deprioritises thin pages and dilutes topical
+       * authority across them, so removing them from the index can help.
+       * Trade-off: loses long-tail "site:domain.com + tag" combo discoverability,
+       * so default off — opt in deliberately when a site has lots of singleton
+       * tag pages.
+       */
+      thinArchive: z
+        .object({
+          noindex: z.boolean().default(false),
+          threshold: z.number().int().positive().default(3),
         })
         .default({}),
       sidebar: z

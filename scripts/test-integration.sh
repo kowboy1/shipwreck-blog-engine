@@ -292,6 +292,72 @@ else
   fail "Sitemap missing or doesn't list posts"
 fi
 
+# v0.3.18: image sitemap exists + lists posts with their featured images +
+# robots.txt references it
+IMG_SITEMAP="$TEST_SITE/dist/image-sitemap.xml"
+if [[ -f "$IMG_SITEMAP" ]] && grep -q "image:image" "$IMG_SITEMAP" && grep -q "hello-world" "$IMG_SITEMAP"; then
+  ok "Image sitemap exists with image:image entries"
+else
+  fail "Image sitemap missing or malformed"
+fi
+if grep -q "image-sitemap.xml" "$TEST_SITE/dist/robots.txt"; then
+  ok "robots.txt references the image sitemap"
+else
+  fail "robots.txt missing image-sitemap reference"
+fi
+
+# v0.3.18: SEO meta enrichment on the built post page
+SEO_CHECKS=(
+  'og:image:width:og:image:width'
+  'og:image:height:og:image:height'
+  'og:image:alt:og:image:alt'
+  'twitter:image:alt:twitter:image:alt'
+  'rel=.preload.[^>]*as=.image':'LCP preload hint for hero'
+  'rel=.alternate.[^>]*type=.application/rss\+xml':'RSS rel=alternate link'
+  '"wordCount"':'wordCount in JSON-LD Article'
+  '"inLanguage"':'inLanguage in JSON-LD'
+  '"dateCreated"':'dateCreated in JSON-LD'
+  '"@type":"ImageObject"':'Article image as ImageObject'
+)
+for spec in "${SEO_CHECKS[@]}"; do
+  pattern="${spec%%:*}"
+  label="${spec#*:}"
+  if grep -qE "$pattern" "$POST_HTML"; then
+    ok "$label present on post page"
+  else
+    fail "$label MISSING on post page"
+  fi
+done
+
+# v0.3.18: CollectionPage JSON-LD on /blog/ index
+INDEX_HTML="$TEST_SITE/dist/index.html"
+if grep -q '"@type":"CollectionPage"' "$INDEX_HTML"; then
+  ok "/blog/ index emits CollectionPage JSON-LD"
+else
+  fail "/blog/ index MISSING CollectionPage JSON-LD"
+fi
+if grep -qE 'rel=.alternate.[^>]*type=.application/rss\+xml' "$INDEX_HTML"; then
+  ok "/blog/ index emits RSS rel=alternate"
+else
+  fail "/blog/ index MISSING RSS rel=alternate"
+fi
+
+# v0.3.18: every <img> in built post page has width + height + decoding="async"
+TOTAL_IMGS=$(grep -oE '<img\b[^>]*>' "$POST_HTML" | wc -l)
+IMGS_WITH_W=$(grep -oE '<img\b[^>]*width=' "$POST_HTML" | wc -l)
+IMGS_WITH_H=$(grep -oE '<img\b[^>]*height=' "$POST_HTML" | wc -l)
+IMGS_WITH_DEC=$(grep -oE '<img\b[^>]*decoding=' "$POST_HTML" | wc -l)
+if [[ $TOTAL_IMGS -gt 0 && $IMGS_WITH_W -eq $TOTAL_IMGS && $IMGS_WITH_H -eq $TOTAL_IMGS ]]; then
+  ok "Every <img> on post page has width + height (CLS prevention)"
+else
+  fail "Post page has $TOTAL_IMGS images; $IMGS_WITH_W with width, $IMGS_WITH_H with height (expected all)"
+fi
+if [[ $TOTAL_IMGS -gt 0 && $IMGS_WITH_DEC -eq $TOTAL_IMGS ]]; then
+  ok "Every <img> on post page has decoding=\"async\""
+else
+  fail "Only $IMGS_WITH_DEC of $TOTAL_IMGS post-page images have decoding attr"
+fi
+
 # v0.3.13: /blog/ index has the filter sidebar + embedded manifest
 INDEX_HTML="$TEST_SITE/dist/index.html"
 if grep -q 'id="shipwreck-blog-filters"' "$INDEX_HTML"; then
