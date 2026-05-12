@@ -10,6 +10,12 @@ interface Props {
   layout?: "grid" | "stack"
   /** Card visual style. "card" (default) = bordered/elevated. "list" = list item with bottom border. */
   variant?: "card" | "list"
+  /** Fallback featured image — passed through to PostCard so cards without
+   * a per-post featuredImage render the same fallback as cards on /blog/.
+   * Without this, "More articles" / "Related articles" cards on post pages
+   * would show empty image slots while the same posts on /blog/ correctly
+   * render the fallback. */
+  fallbackImage?: string
 }
 
 const {
@@ -18,6 +24,7 @@ const {
   title = "Related articles",
   layout = "grid",
   variant = "card",
+  fallbackImage,
 } = Astro.props
 
 // Adapt the grid to the number of posts so a single related post doesn't
@@ -38,7 +45,7 @@ const containerClass = layout === "grid"
     <h2 class="mb-6 font-heading text-xl font-semibold text-primary">{title}</h2>
     <div class={containerClass}>
       {posts.map((post) => (
-        <PostCard post={post} basePath={basePath} variant={variant} />
+        <PostCard post={post} basePath={basePath} variant={variant} fallbackImage={fallbackImage} />
       ))}
     </div>
   </section>

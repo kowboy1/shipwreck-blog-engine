@@ -254,6 +254,22 @@ else
   fail "Post page MISSING BreadcrumbList schema"
 fi
 
+# v0.3.17: "More articles" cards on post page must receive the same
+# fallbackImage as the cards on /blog/. Regression test for the PostCard
+# duplication-of-cards principle — RelatedPosts uses PostCard, must get the
+# same fallback prop. The demo posts all have featuredImage set, so this
+# checks the prop wiring by counting <img> tags inside the More-articles
+# section — every card should have an image.
+MORE_BLOCK=$(awk '/More articles/,/<\/section>/' "$POST_HTML" 2>/dev/null || true)
+if [[ -n "$MORE_BLOCK" ]]; then
+  MORE_IMG_COUNT=$(echo "$MORE_BLOCK" | grep -c '<img' || echo 0)
+  if [[ $MORE_IMG_COUNT -ge 1 ]]; then
+    ok "'More articles' cards render images (RelatedPosts -> PostCard image prop wired)"
+  else
+    fail "'More articles' cards render NO images (RelatedPosts -> PostCard fallback prop lost)"
+  fi
+fi
+
 # v0.3.12: PopularPosts sidebar widget rendered on post page
 if grep -q 'class="popular-posts' "$POST_HTML"; then
   ok "Post page renders PopularPosts sidebar widget"

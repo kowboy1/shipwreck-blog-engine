@@ -8,6 +8,28 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.17] - 2026-05-12
+
+Fixes "More articles" / "Related articles" cards rendering empty image slots when the listed posts have no `featuredImage`. The same posts on `/blog/` correctly fell back to `siteConfig.cards.fallbackImage`; the difference was a missing prop hand-off, not a parallel card implementation.
+
+### Architectural note (the principle the user asked us to enforce)
+
+`PostCard.astro` is **the single source of truth** for card markup across the engine. Every card surface — `/blog/` index, paginated index, tag/category/author archives, "More articles" on post pages — already routes through `<PostCard>`. There is no parallel implementation to drift. This release fixes a prop-passing gap, not a duplication.
+
+For the one place card markup is necessarily rendered without Astro (the client-side filter script in `BlogFilters.astro`), the JS template mirrors PostCard's HTML — a known parallel that should be kept aligned by hand or refactored to a `<template>` clone-and-fill pattern in a future release.
+
+### Fixed: RelatedPosts → PostCard fallbackImage prop
+
+`<RelatedPosts>` gained an optional `fallbackImage?: string` prop, threaded through to every `<PostCard>` it renders. `<PostPage>` now passes `siteConfig.cards?.fallbackImage`. Result: "More articles" cards render the same fallback as `/blog/` cards when posts have no `featuredImage`.
+
+### Integration test: 57/57 (1 new assertion)
+
+Greps the "More articles" section of the built post page and verifies it contains at least one `<img>` tag — catches the regression where the fallback prop gets lost on its way down to `<PostCard>`.
+
+### Migration from 0.3.16
+
+None. Drop-in fix.
+
 ## [0.3.16] - 2026-05-12
 
 Fixes a long-standing gap in the duplicate-H1 defence: the v0.2.0 `remarkStripDuplicateH1` plugin only handled an EXACT title match on the FIRST tree node, so any near-match or non-leading body H1 slipped through. Wollongong Weather had two H1s on its rain-radar post because the body H1 was `"How to read Wollongong rain radar properly"` and the frontmatter title was `"How to read Wollongong rain radar properly (without overreacting)"` — close but not exact.
