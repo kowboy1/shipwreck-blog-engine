@@ -8,6 +8,102 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-12
+
+Minor bump — adds a meaningful new API surface plus closes several Tier-C SEO audit items the engine couldn't address before. View Transitions now span every page type, hero/card images opt into responsive `<picture>` markup, posts gain Speakable + HowTo Schema.org opt-ins, the engine emits skip-to-content links and surfaces per-site preconnect / DNS-prefetch hints, and the integration's inline-stylesheets default ships as `auto`.
+
+### Added: `<ResponsivePicture>` engine component
+
+`@shipwreck/blog-core/components/ResponsivePicture.astro` — drop-in replacement for `<img>` with the same prop shape. When the post declares variants via frontmatter, the engine renders `<picture>` with `<source>` entries so modern browsers pick the smallest acceptable format:
+
+```yaml
+featuredImage: "/uploads/hero.jpg"
+featuredImageAvif: "/uploads/hero.avif"
+featuredImageWebp: "/uploads/hero.webp"
+featuredImageSrcset: "/uploads/hero-480.jpg 480w, /uploads/hero-960.jpg 960w, /uploads/hero-1920.jpg 1920w"
+```
+
+Without variants, renders a plain `<img>` (identical to 0.3.x behaviour). All passed classes always land on the `<img>` regardless of which branch fires.
+
+PostPage hero + PostCard (both `card` and `list` variants) now use `<ResponsivePicture>`. Sites pre-generate variants via their own image pipeline (Squoosh, sharp, ImageMagick, build hook) — no sharp dependency on the engine itself.
+
+### Added: `<ClientRouter />` on PostPage
+
+Astro view transitions now span EVERY engine page type. Previously only listing-to-listing was animated; post-to-post and listing-to-post / post-to-listing fell back to a full reload. Browsers without View Transitions support get the standard reload (no regression).
+
+### Added: skip-to-content link
+
+Both PostPage and ListingPage emit a `sr-only` skip-to-content link as the first focusable element. Pressing Tab on page load surfaces the link, Enter jumps focus to `<main id="shipwreck-main">` (already the engine's outer wrapper). Required for accessibility compliance + light SEO signal (WCAG 2.1).
+
+### Added: Speakable Schema.org opt-in
+
+Post frontmatter:
+
+```yaml
+speakable:
+  cssSelectors:
+    - ".excerpt"
+    - "h1"
+    - "section.tldr"
+```
+
+Engine emits a `SpeakableSpecification` JSON-LD block when set. Google's voice-search signal for content appropriate to read aloud via Assistant / Home / smart speakers.
+
+### Added: HowTo Schema.org opt-in
+
+For genuine instructional posts:
+
+```yaml
+howTo:
+  name: "How to check Wollongong surf conditions"
+  description: "Quick 4-step pre-surf wind/swell/tide check."
+  totalTime: "PT5M"   # ISO-8601 duration
+  steps:
+    - name: "Pull the live wind"
+      text: "Open Windy and check the next 6 hours of wind direction at coast level."
+    - name: "..."
+      text: "..."
+```
+
+Engine emits a `HowTo` JSON-LD alongside the Article schema when set. Eligible for Google's step-by-step rich result + voice-assistant procedural answers. Don't fake HowTo on non-instructional content — Google flags it as structured-data spam.
+
+### Added: `siteConfig.seo.preconnects` + `dnsPrefetches`
+
+```ts
+seo: {
+  preconnects: [
+    "https://embed.windy.com",
+    "https://api.bom.gov.au",
+  ],
+  dnsPrefetches: [
+    "https://cdn.example.com",
+  ],
+}
+```
+
+Engine emits `<link rel="preconnect">` / `<link rel="dns-prefetch">` for each entry on every blog page. Speeds up third-party resource fetches the site is known to make.
+
+### Schema additions
+
+- `post.ts`: `featuredImageAvif?`, `featuredImageWebp?`, `featuredImageSrcset?`, `speakable?`, `howTo?`
+- `site-config.ts`: `seo.preconnects?`, `seo.dnsPrefetches?`
+
+### Integration test: 82/82 (3 new assertions)
+
+- ClientRouter present on post pages (`astro-route-announcer` sentinel)
+- Skip-to-content link rendered on both PostPage and ListingPage
+
+### Migration from 0.3.19
+
+None required. All additions are opt-in via frontmatter or `siteConfig`:
+
+- Want responsive images? Pre-generate variants and add the new frontmatter fields.
+- Want Speakable / HowTo? Add the frontmatter blocks where it makes sense per post.
+- Want preconnect / DNS-prefetch? Add the lists to `siteConfig.seo`.
+- Skip-to-content + ClientRouter + inline-stylesheets ship by default — verified non-breaking via the test suite.
+
+Consumer BaseLayouts already render `meta.links` correctly (since 0.3.18); preconnect / DNS-prefetch flow through that pipe with zero per-site code changes.
+
 ## [0.3.19] - 2026-05-12
 
 Engine-side automation for the three biggest "self-serve" SEO surfaces flagged in the 0.3.18 audit follow-up: intrinsic image dimensions auto-probed at build time (no manual frontmatter), inline-stylesheets enabled at the integration layer for FCP, and full E-E-A-T author Schema.org Person emitted automatically from the existing author JSON files.

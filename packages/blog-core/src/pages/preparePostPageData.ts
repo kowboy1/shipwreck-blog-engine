@@ -20,6 +20,8 @@ import {
   articleSchema,
   breadcrumbSchema,
   faqSchema,
+  speakableSchema,
+  howToSchema,
   type ArticleAuthor,
   type MetaTags,
 } from "../seo/index.js"
@@ -184,6 +186,17 @@ export async function preparePostPageData(
   ]
   if (post.data.faqItems && post.data.faqItems.length > 0) {
     jsonLd.push(faqSchema(post.data.faqItems))
+  }
+  // Speakable schema (voice-search eligibility) — only emitted when post
+  // frontmatter declares which page sections are appropriate to read aloud.
+  if (post.data.speakable &&
+      ((post.data.speakable.cssSelectors?.length ?? 0) > 0 ||
+       (post.data.speakable.xpath?.length ?? 0) > 0)) {
+    jsonLd.push(speakableSchema(post.data.speakable))
+  }
+  // HowTo schema for genuine step-by-step instructional posts.
+  if (post.data.howTo && post.data.howTo.steps.length > 0) {
+    jsonLd.push(howToSchema(post.data.howTo))
   }
 
   // Bottom "More articles" grid: prefer related (topic-similar) posts, fall back

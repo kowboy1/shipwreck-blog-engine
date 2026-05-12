@@ -1,0 +1,77 @@
+---
+/**
+ * Responsive hero / card image renderer. Drop-in replacement for `<img>`
+ * with the same prop shape — when the post declares `featuredImageAvif`,
+ * `featuredImageWebp`, or `featuredImageSrcset` variants, the engine wraps
+ * the image in `<picture>` with `<source>` entries so modern browsers
+ * pick the smallest acceptable format. No JS, no sharp/imagemagick
+ * runtime dependency — sites generate variants ahead of time.
+ *
+ * When no variants are declared, renders a plain `<img>` (identical to
+ * pre-0.4.0 behaviour). All passed classes always land on the `<img>`
+ * element regardless of which branch fires.
+ */
+interface Props {
+  src: string
+  alt: string
+  width?: number | string
+  height?: number | string
+  class?: string
+  loading?: "lazy" | "eager"
+  decoding?: "async" | "sync" | "auto"
+  fetchpriority?: "high" | "low" | "auto"
+  /** AVIF variant (modern format, smallest payload). */
+  avif?: string
+  /** WebP variant (broad modern-format support). */
+  webp?: string
+  /** Explicit srcset for the primary image (when site pre-generated widths). */
+  srcset?: string
+  /** Sizes attribute. */
+  sizes?: string
+  /** Aria-hidden for decorative fallback images. */
+  ariaHidden?: boolean
+}
+
+const {
+  src, alt, width, height,
+  class: imgClass = "",
+  loading,
+  decoding = "async",
+  fetchpriority,
+  avif, webp, srcset, sizes,
+  ariaHidden,
+} = Astro.props
+
+const hasVariants = !!avif || !!webp || !!srcset
+---
+
+{hasVariants ? (
+  <picture class="contents">
+    {avif && <source type="image/avif" srcset={avif} sizes={sizes} />}
+    {webp && <source type="image/webp" srcset={webp} sizes={sizes} />}
+    {srcset && <source srcset={srcset} sizes={sizes} />}
+    <img
+      src={src}
+      alt={alt}
+      aria-hidden={ariaHidden ? "true" : undefined}
+      width={width}
+      height={height}
+      loading={loading}
+      decoding={decoding}
+      fetchpriority={fetchpriority}
+      class={imgClass}
+    />
+  </picture>
+) : (
+  <img
+    src={src}
+    alt={alt}
+    aria-hidden={ariaHidden ? "true" : undefined}
+    width={width}
+    height={height}
+    loading={loading}
+    decoding={decoding}
+    fetchpriority={fetchpriority}
+    class={imgClass}
+  />
+)}

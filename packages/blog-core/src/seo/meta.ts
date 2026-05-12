@@ -101,6 +101,16 @@ export function buildPostMeta(args: {
   const links: MetaLink[] = [
     { rel: "alternate", href: rssHref, type: "application/rss+xml" },
   ]
+  // Preconnect / DNS-prefetch hints for external origins (siteConfig.seo).
+  // Preconnect is more expensive but pays off when the site is likely to
+  // request resources from the origin during this navigation; dns-prefetch
+  // is the lighter cousin. Engine emits both when configured per-site.
+  for (const origin of siteConfig.seo.preconnects ?? []) {
+    links.push({ rel: "preconnect", href: origin })
+  }
+  for (const origin of siteConfig.seo.dnsPrefetches ?? []) {
+    links.push({ rel: "dns-prefetch", href: origin })
+  }
 
   return {
     title,

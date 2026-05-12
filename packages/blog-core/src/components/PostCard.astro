@@ -1,5 +1,6 @@
 ---
 import type { Post } from "../schemas/post.js"
+import ResponsivePicture from "./ResponsivePicture.astro"
 
 interface Props {
   post: { id: string; data: Post }
@@ -30,27 +31,35 @@ const wrapperClass = variant === "list"
     {variant === "card" ? (
       <div class="aspect-[16/9] w-full overflow-hidden bg-bg/40">
         {image && (
-          <img
+          <ResponsivePicture
             src={image}
             alt={altText}
-            aria-hidden={isFallback ? "true" : undefined}
+            ariaHidden={isFallback}
             width={imgWidth}
             height={imgHeight}
             loading="lazy"
             decoding="async"
+            avif={post.data.featuredImageAvif}
+            webp={post.data.featuredImageWebp}
+            srcset={post.data.featuredImageSrcset}
+            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
             class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
           />
         )}
       </div>
     ) : (
       image && (
-        <img
+        <ResponsivePicture
           src={image}
           alt={altText}
           width={imgWidth}
           height={imgHeight}
           loading="lazy"
           decoding="async"
+          avif={post.data.featuredImageAvif}
+          webp={post.data.featuredImageWebp}
+          srcset={post.data.featuredImageSrcset}
+          sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
           class="mb-4 aspect-[16/9] w-full rounded-card object-cover"
         />
       )

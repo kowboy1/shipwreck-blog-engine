@@ -378,6 +378,25 @@ if grep -qE 'inlineStylesheets|<style>' "$POST_HTML"; then
   ok "Inline-stylesheets active (some CSS in <style> blocks)"
 fi
 
+# v0.4.0: ClientRouter on post pages (view transitions across all page types)
+if grep -q 'astro-route-announcer' "$POST_HTML"; then
+  ok "Post page emits ClientRouter (view transitions enabled)"
+else
+  fail "Post page MISSING ClientRouter — view transitions only on listings"
+fi
+
+# v0.4.0: skip-to-content link emitted from engine pages
+if grep -q 'href="#shipwreck-main"' "$POST_HTML"; then
+  ok "Post page renders skip-to-content link (accessibility)"
+else
+  fail "Post page MISSING skip-to-content link"
+fi
+if grep -q 'href="#shipwreck-main"' "$INDEX_HTML"; then
+  ok "Index page renders skip-to-content link"
+else
+  fail "Index page MISSING skip-to-content link"
+fi
+
 # v0.3.18: every <img> in built post page has width + height + decoding="async"
 TOTAL_IMGS=$(grep -oE '<img\b[^>]*>' "$POST_HTML" | wc -l)
 IMGS_WITH_W=$(grep -oE '<img\b[^>]*width=' "$POST_HTML" | wc -l)

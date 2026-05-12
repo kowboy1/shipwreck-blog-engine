@@ -13,6 +13,7 @@
  * That means engine fixes to the article rendering ship through
  * `npm update` instead of requiring a per-site patch.
  */
+import { ClientRouter } from "astro:transitions"
 import type { PostPageData } from "./preparePostPageData.js"
 import type { SiteConfig } from "../schemas/site.js"
 import ArticleLayout from "../components/ArticleLayout.astro"
@@ -24,6 +25,7 @@ import AuthorAvatar from "../components/AuthorAvatar.astro"
 import TagList from "../components/TagList.astro"
 import CTABlock from "../components/CTABlock.astro"
 import PopularPosts from "../components/PopularPosts.astro"
+import ResponsivePicture from "../components/ResponsivePicture.astro"
 
 interface Props {
   data: PostPageData
@@ -45,7 +47,13 @@ const heroImage = post.data.featuredImage
 const layout = siteConfig.layout ?? {}
 ---
 
-<div class="mx-auto max-w-7xl">
+<ClientRouter />
+
+<a href="#shipwreck-main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-button focus:bg-bg-elevated focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary focus:shadow-card focus:outline focus:outline-2 focus:outline-accent">
+  Skip to article
+</a>
+
+<div id="shipwreck-main" class="mx-auto max-w-7xl">
   <Breadcrumbs items={crumbs} />
 
   <ArticleLayout>
@@ -143,13 +151,17 @@ const layout = siteConfig.layout ?? {}
         )}
 
         {heroImage && (
-          <img
+          <ResponsivePicture
             src={heroImage}
             alt={post.data.featuredImageAlt ?? post.data.title}
             width={post.data.featuredImageWidth ?? 1200}
             height={post.data.featuredImageHeight ?? 675}
             decoding="async"
             fetchpriority="high"
+            avif={post.data.featuredImageAvif}
+            webp={post.data.featuredImageWebp}
+            srcset={post.data.featuredImageSrcset}
+            sizes="(min-width: 1024px) 720px, 100vw"
             class="mt-8 aspect-[16/9] w-full rounded-card object-cover"
           />
         )}

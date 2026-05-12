@@ -48,7 +48,11 @@ const filtersActive = showFilters === true && !!filterFacets && !!filterManifest
 
 <ClientRouter />
 
-<div class:list={["mx-auto", filtersActive ? "max-w-7xl listing-with-filters" : "max-w-7xl"]}>
+<a href="#shipwreck-main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-button focus:bg-bg-elevated focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary focus:shadow-card focus:outline focus:outline-2 focus:outline-accent">
+  Skip to content
+</a>
+
+<div id="shipwreck-main" class:list={["mx-auto", filtersActive ? "max-w-7xl listing-with-filters" : "max-w-7xl"]}>
   {crumbs.length > 0 && <Breadcrumbs items={crumbs} />}
 
   <h1 class={`font-heading text-4xl font-bold text-primary${crumbs.length > 0 ? " mt-4" : ""}`}>

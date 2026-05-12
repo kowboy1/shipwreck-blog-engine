@@ -37,10 +37,52 @@ export const postSchema = z.object({
   featuredImage: z.string().optional(),
   featuredImageAlt: z.string().optional(),
   /** Intrinsic image width in pixels. Used for `<img width=...>` (CLS prevention)
-   * and og:image:width / Schema.org ImageObject.width. Engine default 1200. */
+   * and og:image:width / Schema.org ImageObject.width. Engine auto-detects
+   * from local files (SVG viewBox / PNG IHDR / JPEG SOF) when omitted;
+   * falls back to 1200 if detection fails. */
   featuredImageWidth: z.number().int().positive().optional(),
-  /** Intrinsic image height in pixels. Engine default 675 (16:9 against width 1200). */
+  /** Intrinsic image height in pixels. Default 675 (16:9 against width 1200). */
   featuredImageHeight: z.number().int().positive().optional(),
+  /** Responsive image variants. When set, the engine renders the hero + cards
+   *  as `<picture>` with `<source>` entries — letting modern browsers pick
+   *  the smallest acceptable format (AVIF → WebP → JPEG/PNG fallback). Sites
+   *  with an image pipeline pre-generate variants; engine just wires markup. */
+  featuredImageAvif: z.string().optional(),
+  featuredImageWebp: z.string().optional(),
+  /** Explicit responsive `srcset` for the primary image. Accepts the same
+   *  string format as the HTML attribute: "url 480w, url 960w, url 1920w".
+   *  When set, engine emits a `<source srcset>` with `sizes` derived from
+   *  the layout. Use when an image pipeline has produced multiple widths. */
+  featuredImageSrcset: z.string().optional(),
+
+  /** Speakable Schema.org markup — Google's voice-search signal. Specify
+   *  CSS selectors that identify the spoken portion (intro paragraph, TL;DR,
+   *  etc.). Engine emits a SpeakableSpecification JSON-LD block when set. */
+  speakable: z
+    .object({
+      cssSelectors: z.array(z.string()).optional(),
+      xpath: z.array(z.string()).optional(),
+    })
+    .optional(),
+
+  /** HowTo schema for step-by-step guide posts. When set, engine emits
+   *  HowTo JSON-LD alongside the Article schema. */
+  howTo: z
+    .object({
+      name: z.string(),
+      description: z.string().optional(),
+      totalTime: z.string().optional(), // ISO 8601 duration, e.g. "PT30M"
+      estimatedCost: z.string().optional(),
+      steps: z.array(
+        z.object({
+          name: z.string(),
+          text: z.string(),
+          url: z.string().optional(),
+          image: z.string().optional(),
+        }),
+      ),
+    })
+    .optional(),
 
   metaTitle: z.string().max(70).optional(),
   metaDescription: z.string().max(170).optional(),

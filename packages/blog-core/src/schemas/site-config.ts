@@ -23,6 +23,14 @@ export const siteConfigSchema = z.object({
     defaultAuthorAvatar: z.string().optional(),
     twitterHandle: z.string().optional(),
     locale: z.string().default("en_AU"),
+    /** External origins to preconnect to from every blog page. Speeds up
+     *  third-party resource fetches (fonts, analytics, embeds, CDN). Each
+     *  entry becomes `<link rel="preconnect" href="...">` in <head>. */
+    preconnects: z.array(z.string().url()).optional(),
+    /** External origins to DNS-prefetch (cheaper than preconnect — only
+     *  resolves DNS, doesn't open the TCP+TLS connection). Use for low-
+     *  priority third-party origins. */
+    dnsPrefetches: z.array(z.string().url()).optional(),
   }),
 
   layout: z

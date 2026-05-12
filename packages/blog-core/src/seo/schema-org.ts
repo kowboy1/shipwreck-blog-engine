@@ -136,6 +136,60 @@ export function faqSchema(items: FaqItem[]) {
 }
 
 /**
+ * Speakable Schema.org markup — Google's signal for content that's
+ * appropriate to read aloud via voice assistants. Mark up the intro,
+ * TL;DR, or summary sections via CSS selectors or XPath. Increases
+ * eligibility for Google Assistant audio surfaces.
+ */
+export function speakableSchema(input: {
+  cssSelectors?: string[]
+  xpath?: string[]
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "SpeakableSpecification",
+    ...(input.cssSelectors && input.cssSelectors.length > 0
+      ? { cssSelector: input.cssSelectors }
+      : {}),
+    ...(input.xpath && input.xpath.length > 0 ? { xpath: input.xpath } : {}),
+  }
+}
+
+/**
+ * HowTo Schema.org markup — eligibility for step-by-step rich result
+ * formats and voice-assistant procedural answers. Use for genuine
+ * instructional content; faking it risks a structured-data manual action.
+ */
+export function howToSchema(input: {
+  name: string
+  description?: string
+  totalTime?: string
+  estimatedCost?: string
+  steps: Array<{ name: string; text: string; url?: string; image?: string }>
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name: input.name,
+    ...(input.description ? { description: input.description } : {}),
+    ...(input.totalTime ? { totalTime: input.totalTime } : {}),
+    ...(input.estimatedCost
+      ? {
+          estimatedCost: { "@type": "MonetaryAmount", value: input.estimatedCost, currency: "USD" },
+        }
+      : {}),
+    step: input.steps.map((s, i) => ({
+      "@type": "HowToStep",
+      position: i + 1,
+      name: s.name,
+      text: s.text,
+      ...(s.url ? { url: s.url } : {}),
+      ...(s.image ? { image: s.image } : {}),
+    })),
+  }
+}
+
+/**
  * CollectionPage schema for blog index + tag / category / author archive
  * pages. Tells crawlers the page is a curated list of items (not a generic
  * web page or an article) — improves SERP-type classification.
