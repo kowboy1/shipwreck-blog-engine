@@ -8,6 +8,75 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.12] - 2026-05-12
+
+"Popular articles" sidebar widget on post pages. Analytics-driven when a `.shipwreck/popularity.json` file is present; falls back to most-recent posts so the widget never renders empty. Engine stays analytics-provider-agnostic — popularity data is produced out-of-band by a per-site script that hits whichever analytics API the site uses. Reference Cloudflare Web Analytics producer ships with the engine.
+
+### Added: `<PopularPosts>` component
+
+`@shipwreck/blog-core/components/PopularPosts.astro` — compact stacked mini cards (rank pill + thumbnail + title + date) sized for the 280px right-column. `line-clamp-2` on titles, lazy thumbnails, `aria-hidden` + empty alt on fallback images.
+
+### Added: `siteConfig.sidebar.popular` + manual override
+
+```ts
+sidebar: {
+  popular: {
+    enabled: true,                 // default — set false to suppress widget
+    limit: 5,                       // default 5 mini cards
+    heading: "Popular articles",   // override the visible heading
+  }
+}
+
+// Manual pin override (highest priority over popularity.json + recency):
+featuredPostsForSidebar: ["slug-1", "slug-2", ...]
+```
+
+### Added: popularity data contract (`popularitySchema`)
+
+`packages/blog-core/src/schemas/popularity.ts` — Zod schema for `.shipwreck/popularity.json` (sibling to `art-direction.json`). Exported from `@shipwreck/blog-core` for any producer to validate before writing.
+
+### Added: `loadPopularityFile` + `selectPopularPosts` utilities
+
+Selection logic in priority order:
+1. `featuredPostsForSidebar` manual pin (always wins)
+2. `popularity.posts` ranked by views, padded with recency if short of limit
+3. Most-recent-published fallback (always non-empty when ≥1 other post exists)
+
+Returns `{ posts, source }` — source is `"manual-override" | "popularity-file" | "recency-fallback"`.
+
+### Added: Cloudflare Web Analytics producer
+
+`scripts/refresh-popularity.mjs` — reference producer. Hits the CF GraphQL Analytics API's `rumPageloadEventsAdaptiveGroups`, filters to URLs under `BLOG_BASE_PATH`, writes the schema-conformant JSON. Config via env vars (`CF_API_TOKEN`, `CF_ACCOUNT_TAG`, `CF_WEB_ANALYTICS_SITE_TAG`). Runs out-of-band — engine never makes live API calls at build time.
+
+Other producers (Plausible, GA4, server logs, manual edit) can write the same shape and the engine consumes them identically.
+
+### Added: doctor `popularity.json` staleness check
+
+If the file exists, doctor verifies `generatedAt` is within 30 days. Stale → warning. Unparseable → warning. Absent → silent (recency fallback works).
+
+### Wired into `preparePostPageData` + `<PostPage>`
+
+`<PopularPosts>` renders inside the right-column `aside` directly below `<CTABlock>` — both inside the same sticky container so they scroll together.
+
+When `siteConfig.sidebar.popular.enabled === false` or no eligible posts exist, the widget renders nothing (graceful collapse).
+
+### Integration test: 49/49 (3 new assertions)
+
+- CSS contains `line-clamp-2` sentinel (PopularPosts utility)
+- Post page renders the PopularPosts sidebar widget
+- Widget contains at least one mini-card link to another post
+
+### Migration from 0.3.11
+
+Drop-in additive — no consumer changes required. To enable analytics-driven popularity:
+
+1. In your per-site repo, copy `scripts/refresh-popularity.mjs` and set up a runner (cron or GitHub Action).
+2. Set env vars: `CF_API_TOKEN`, `CF_ACCOUNT_TAG`, `CF_WEB_ANALYTICS_SITE_TAG`.
+3. Schedule it nightly. Output goes to `<site-repo>/.shipwreck/popularity.json`.
+4. Rebuild the site — the sidebar automatically picks up the data.
+
+Until that's set up, the widget shows the 5 most-recent posts (excluding the current article). To pin specific posts regardless of analytics, set `featuredPostsForSidebar: ["slug-1", ...]` in `site.config.ts`.
+
 ## [0.3.11] - 2026-05-12
 
 Hero images are now **mandatory** for every published post. Doctor enforces it, the `add-shipwreck-blog-post` skill walks the agent through a generation flow (NyXi-side: GPT-via-OAuthed-business-account), and a new per-site `.shipwreck/art-direction.json` file keeps generated imagery coherent across posts. SEO-first: every post now ships with a unique OG card and a 16:9 image-search-discoverable asset.

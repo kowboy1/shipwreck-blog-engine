@@ -55,6 +55,31 @@ export const siteConfigSchema = z.object({
       policy: z.enum(["required", "optional"]).default("required"),
     })
     .default({}),
+
+  sidebar: z
+    .object({
+      /**
+       * "Popular articles" widget on post pages.
+       * Reads .shipwreck/popularity.json if present; falls back to most-recent
+       * published posts (excluding current) when no popularity data exists.
+       */
+      popular: z
+        .object({
+          enabled: z.boolean().default(true),
+          limit: z.number().int().positive().default(5),
+          heading: z.string().default("Popular articles"),
+        })
+        .default({}),
+    })
+    .default({}),
+
+  /**
+   * Optional manual override for the sidebar's "Popular articles" widget.
+   * When set, supersedes popularity.json and recency fallback. Use to pin
+   * specific posts (e.g. promote a flagship piece for a month).
+   * Entries are slugs (no .mdx) — same form as filenames in src/content/posts/.
+   */
+  featuredPostsForSidebar: z.array(z.string()).optional(),
 })
 
 export type SiteConfig = z.infer<typeof siteConfigSchema>

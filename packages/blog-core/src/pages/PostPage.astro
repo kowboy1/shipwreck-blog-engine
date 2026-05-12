@@ -23,6 +23,7 @@ import AuthorBio from "../components/AuthorBio.astro"
 import AuthorAvatar from "../components/AuthorAvatar.astro"
 import TagList from "../components/TagList.astro"
 import CTABlock from "../components/CTABlock.astro"
+import PopularPosts from "../components/PopularPosts.astro"
 
 interface Props {
   data: PostPageData
@@ -35,7 +36,9 @@ interface Props {
 }
 
 const { data, siteConfig, ctaRegistry } = Astro.props
-const { post, Content, headings, authors, readingLabel, bottomGridPosts, crumbs } = data
+const { post, Content, headings, authors, readingLabel, bottomGridPosts, popularPosts, popularSource, popularWindow, crumbs } = data
+const sidebarPopular = siteConfig.sidebar?.popular ?? { enabled: true, limit: 5, heading: "Popular articles" }
+const showPopular = sidebarPopular.enabled !== false && popularPosts.length > 0
 
 // Hero image only renders when the post explicitly sets one (no OG-image fallback).
 const heroImage = post.data.featuredImage
@@ -63,6 +66,15 @@ const layout = siteConfig.layout ?? {}
         postOverride={post.data.ctaBlock}
         registry={ctaRegistry}
       />
+      {showPopular && (
+        <PopularPosts
+          posts={popularPosts}
+          basePath={siteConfig.blogBasePath}
+          heading={sidebarPopular.heading ?? "Popular articles"}
+          fallbackImage={siteConfig.cards?.fallbackImage}
+          windowLabel={popularSource === "popularity-file" ? popularWindow : undefined}
+        />
+      )}
     </aside>
 
     <article>

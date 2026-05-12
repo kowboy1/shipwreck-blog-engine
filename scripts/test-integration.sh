@@ -164,7 +164,7 @@ if [[ $CSS_SIZE_BYTES -lt 15000 ]]; then
 fi
 ok "Built CSS size sanity (${CSS_SIZE_BYTES} bytes — engine classes appear scanned)"
 
-REQUIRED_CLASSES=(max-w-7xl 'lg\\:grid-cols-3' rounded-card text-4xl font-heading not-prose 'lg\\:hidden')
+REQUIRED_CLASSES=(max-w-7xl 'lg\\:grid-cols-3' rounded-card line-clamp-2 text-4xl font-heading not-prose 'lg\\:hidden')
 for class in "${REQUIRED_CLASSES[@]}"; do
   if grep -q "$class" "$CSS_FILE"; then
     ok "CSS contains engine class: $class"
@@ -202,6 +202,20 @@ if grep -q '"@type":"BreadcrumbList"' "$POST_HTML"; then
   ok "Post page emits BreadcrumbList JSON-LD schema"
 else
   fail "Post page MISSING BreadcrumbList schema"
+fi
+
+# v0.3.12: PopularPosts sidebar widget rendered on post page
+if grep -q 'class="popular-posts' "$POST_HTML"; then
+  ok "Post page renders PopularPosts sidebar widget"
+else
+  fail "Post page MISSING PopularPosts sidebar widget"
+fi
+# And the widget includes at least one mini-card link to another post
+if grep -qE '<aside[^>]*popular-posts[^>]*>[\s\S]*?<a[[:space:]]+href="/blog/' "$POST_HTML" \
+  || (grep -A 40 'class="popular-posts' "$POST_HTML" | grep -q 'href="/blog/'); then
+  ok "PopularPosts widget contains at least one mini-card link"
+else
+  fail "PopularPosts widget rendered but contains no card links"
 fi
 
 # Sitemap is non-empty + lists posts

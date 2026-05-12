@@ -783,6 +783,38 @@ if (!PREFLIGHT) {
   }
 }
 
+// 5e. Popularity data staleness (v0.3.12+). If .shipwreck/popularity.json
+// exists, warn when it's older than 30 days — the rolling window is meaningless
+// if no one's running the producer. Soft signal only, never fatal.
+if (!PREFLIGHT) {
+  const popCandidates = ["..", "."]
+    .map((p) => resolve(CWD, p, ".shipwreck/popularity.json"))
+  const popPath = popCandidates.find((p) => existsSync(p))
+  if (popPath) {
+    try {
+      const data = JSON.parse(readFileSync(popPath, "utf8"))
+      const ageMs = Date.now() - new Date(data.generatedAt).getTime()
+      const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24))
+      if (ageDays > 30) {
+        warning(
+          "popularity.json is stale",
+          `${popPath.replace(CWD, ".")} generated ${ageDays}d ago. Producer (scripts/refresh-popularity.mjs) may have stopped running. Sidebar will keep working — engine falls back to recency — but the "popular" signal is no longer recent.`,
+        )
+      } else {
+        pass(
+          "popularity.json fresh",
+          `${popPath.replace(CWD, ".")} generated ${ageDays}d ago (source: ${data.source ?? "unknown"})`,
+        )
+      }
+    } catch {
+      warning(
+        "popularity.json is unparseable",
+        `${popPath.replace(CWD, ".")} exists but is not valid JSON / not matching the popularitySchema. Sidebar will fall back to recency.`,
+      )
+    }
+  }
+}
+
 // 6. Source-vs-deploy layout guardrail (Nyxi feedback #6)
 // The blog SOURCE repo should not be the same dir as the host's static MOUNT path.
 // If you accidentally point your blog source at the host's docroot, you'll
@@ -822,11 +854,11 @@ if (!SKIP_BUILD) {
       fail("Built dist has no CSS files", `Expected at least one .css under ${distCssDir}`)
     } else {
       const allCss = cssFiles.map((f) => readFileSync(join(distCssDir, f), "utf8")).join("\n")
-      // Sentinel utility classes from engine page renderers. Updated for v0.3.10:
-      // ListingPage moved from max-w-3xl to max-w-7xl + 3-col card grid; max-w-3xl
-      // no longer appears in any engine page. lg:grid-cols-3 + rounded-card
-      // sentinels guard against the card-grid regression.
-      const expected = ["max-w-7xl", "lg\\:grid-cols-3", "rounded-card", "text-4xl", "font-heading", "lg\\:hidden", "hidden", "not-prose"]
+      // Sentinel utility classes from engine page renderers. Updated for v0.3.12:
+      // line-clamp-2 is used by PopularPosts.astro for title truncation in mini
+      // cards — guards against the sidebar widget being tree-shaken if
+      // Tailwind can't see the engine pages/ + components/ dir.
+      const expected = ["max-w-7xl", "lg\\:grid-cols-3", "rounded-card", "line-clamp-2", "text-4xl", "font-heading", "lg\\:hidden", "hidden", "not-prose"]
       const missing = expected.filter((cls) => !allCss.includes(cls))
       if (missing.length > 0) {
         fail(

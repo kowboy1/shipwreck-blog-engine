@@ -26,6 +26,7 @@ import {
 import { rankRelatedPosts } from "../utils/related.js"
 import { readingTimeLabel } from "../utils/reading-time.js"
 import { getPostAuthorIds } from "../utils/authors.js"
+import { loadPopularityFile, selectPopularPosts } from "../utils/popularity.js"
 
 interface PostEntry {
   id: string
@@ -77,6 +78,12 @@ export interface PostPageData {
   readingLabel: string | undefined
   /** Posts shown in the bottom "More articles" grid */
   bottomGridPosts: PostEntry[]
+  /** Posts shown in the sticky right-sidebar "Popular articles" widget (max siteConfig.sidebar.popular.limit) */
+  popularPosts: PostEntry[]
+  /** Source identifier for popularPosts — "manual-override" | "popularity-file" | "recency-fallback" */
+  popularSource: "manual-override" | "popularity-file" | "recency-fallback"
+  /** Rolling window of the popularity data ("30d" etc) — set only when popularSource === "popularity-file" */
+  popularWindow?: string
   /** Breadcrumbs for the page (final crumb has no url) */
   crumbs: Array<{ name: string; url?: string }>
   /** Canonical URL for the post */
@@ -144,6 +151,20 @@ export async function preparePostPageData(
     related.length > 0 ? related : featured.length > 0 ? featured : candidates
   ).slice(0, siteConfig.layout?.relatedPostsCount ?? 3)
 
+  // Sidebar "Popular articles" — manual override > popularity.json > recency.
+  const popularity = loadPopularityFile()
+  const popularResult = selectPopularPosts({
+    current: post,
+    all,
+    popularity: popularity.data,
+    override: siteConfig.featuredPostsForSidebar,
+    limit: siteConfig.sidebar?.popular?.limit ?? 5,
+  })
+  const popularWindow =
+    popularResult.source === "popularity-file" && popularity.data
+      ? popularity.data.window
+      : undefined
+
   // Reading time
   const wordCount = (
     remarkPluginFrontmatter as { wordCount?: number } | undefined
@@ -165,6 +186,9 @@ export async function preparePostPageData(
     authors,
     readingLabel,
     bottomGridPosts,
+    popularPosts: popularResult.posts,
+    popularSource: popularResult.source,
+    ...(popularWindow ? { popularWindow } : {}),
     crumbs,
     url,
     meta,
