@@ -49,6 +49,7 @@ docs/                    # architecture, content model, ops, theming reference
 ### Documentation
 
 - **[AGENTS.md](AGENTS.md)** — agent entrypoint (read this if you're an AI agent of any kind)
+- **[FEATURES.md](FEATURES.md)** — canonical, exhaustive feature list with source paths (the catalogue)
 - **[HOW-IT-WORKS.md](HOW-IT-WORKS.md)** — plain-English explainer for humans (what it does, why it's lighter than WordPress, what trade-offs you accept)
 - [ARCHITECTURE.md](ARCHITECTURE.md) — engine internals (technical)
 - [ROLLOUT.md](ROLLOUT.md) — how engine updates propagate to every site
@@ -58,8 +59,24 @@ docs/                    # architecture, content model, ops, theming reference
 - [UPGRADE-GUIDE.md](UPGRADE-GUIDE.md) — moving sites between engine versions
 - [packages/blog-theme-default/TOKEN-CONTRACT.md](packages/blog-theme-default/TOKEN-CONTRACT.md) — canonical theming token list
 
+### What ships in the engine
+
+A compact summary — for the full catalogue with file paths see [FEATURES.md](FEATURES.md).
+
+- **Content & rendering** — Zod-validated frontmatter, MDX posts, automatic ToC, breadcrumbs, related-posts ranking, multi-author support, three-column article layout, 3-col responsive card grid on listings
+- **SEO** — canonical / robots / OG / Twitter meta, rel=prev/next, RSS rel=alternate, LCP preload hint, preconnect / dns-prefetch helpers, image sitemap, posts.json manifest
+- **Schema.org** — Article (with `wordCount`, `inLanguage`, `dateCreated`, `ImageObject`), BlogPosting, Breadcrumb, Organization (toggleable), WebSite (opt-in), CollectionPage, FAQPage, SpeakableSpecification, HowTo, Person with E-E-A-T (`sameAs`, `knowsAbout`, `jobTitle`, `worksFor`, `alumniOf`)
+- **GEO** (Generative Engine Optimization) — Article `abstract`, `about[]`, `mentions[]`, `license`, `copyrightHolder`, `isAccessibleForFree` for AI answer engine citations
+- **Listing UX** — live filter sidebar (search + sort + tag/category chips + featured-only), URL state via `history.replaceState`, native View Transitions FLIP animations, `<details>` mobile accordion, see-more for >6 tags, load-more button
+- **Performance** — image dimension autodetect (SVG / PNG / JPEG), explicit `width`/`height` on every image, `decoding="async"`, `fetchpriority="high"` on heroes, `<picture>` opt-in for AVIF/WebP/srcset, inline-stylesheets auto
+- **Accessibility** — skip-to-content link, ARIA on filters, `prefers-reduced-motion` honoured, `<details>` keyboard accessible
+- **Authoring** — Sveltia CMS pre-wired at `/blog/admin/`, remark plugin auto-strips/downgrades stray body H1s, `seed-posts` doctor subcommand with bundled placeholder hero
+- **Mandatory heroes** — `featuredImage` required by default; engine ships hero generation flow (`shipwreck-blog-doctor heroes` + per-site `.shipwreck/art-direction.json`)
+- **Popular articles widget** — sidebar mini-card list; consumes `.shipwreck/popularity.json` (reference Cloudflare Web Analytics producer included), recency fallback when no data
+- **Doctor** — preflight + closeout gate with state-file attestations, completion-contract versioning, image-sitemap freshness, sentinel CSS class checks, multi-H1 guard, hero-policy enforcement
+
 ### Status
 
-Engine version: **0.3.2** (see [CHANGELOG.md](CHANGELOG.md) for the full history)
+Engine version: **0.4.1** (see [CHANGELOG.md](CHANGELOG.md) for the full history)
 
-The engine is feature-complete for the integration story. Active focus: end-to-end production deploy on the first live site, then graduating stack-specific quirks into [.claude/skills/stack-notes/](.claude/skills/stack-notes/).
+Shipped, deployed to first production site (wollongongweather.com). Active focus: shared-schema package extraction with the Keel framework, GEO enrichment as more sites adopt the engine.

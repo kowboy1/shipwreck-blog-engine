@@ -2,9 +2,9 @@
 
 > 📖 **This file is for humans.** It's a non-technical explainer of what the Shipwreck Blog Engine does, why it's lighter than WordPress, and what trade-offs you accept. Read it once before you integrate, share it with anyone curious about why we don't use WordPress.
 >
-> Agents: this isn't a runbook. If you're integrating, go to [AGENTS.md](AGENTS.md). If you're explaining the project to the user, you can quote from this file freely.
+> Agents: this isn't a runbook. If you're integrating, go to [AGENTS.md](AGENTS.md). For an exhaustive feature catalogue with file paths, see [FEATURES.md](FEATURES.md). If you're explaining the project to the user, you can quote from this file freely.
 >
-> _Last reviewed for engine version: 0.3.5_
+> _Last reviewed for engine version: 0.4.1 (2026-05-13)_
 
 ---
 
@@ -108,6 +108,24 @@ The trade-off (rebuild-to-publish) is genuinely a trade-off — but for blog con
 - The team editing content has zero git tolerance and won't use Sveltia CMS — though Sveltia is designed to look exactly like WordPress, so this is rarer than people assume
 
 For everything else (marketing blogs, news sites, doc sites, personal sites, agency portfolios with a blog), static-first wins on speed, cost, security surface, and operator burden.
+
+---
+
+## What changed since 0.3.5 (plain English)
+
+Lots. The engine went from "first usable static blog" to "modern SEO + GEO + accessibility + UX-polished static blog" across the 0.3.6 → 0.4.1 line. Highlights a non-developer should know about:
+
+- **Every blog post must have a hero image now.** The engine refuses to declare an install done if a published post is missing one. NyXi (your AI agent) generates a hero per post during the add-post flow — first time on a site she'll ask for art direction, then save it as `.shipwreck/art-direction.json` so all future heroes match the site's visual style.
+- **The blog index is a 3-column card grid with live filtering**, no page reloads. Type in the search box (after 3 characters) and the cards update in place. Click a tag chip to filter. Click "Newest / Oldest" to flip the sort. Pick a category. Combine filters freely. URL stays in sync so you can share filtered views.
+- **Post pages got a Popular articles sidebar.** Mini-cards of the most-read 5 posts. Powered by Cloudflare analytics data if you set the producer up nightly, or falls back to most-recent when there's no data yet.
+- **Pages crossfade into each other.** Click from one post to another and the swap is smooth (using the browser's native View Transitions API). No JS animation libraries — pure browser feature.
+- **The engine emits much richer Schema.org JSON-LD.** Articles include word count, language, image dimensions, full author profiles with social links + areas of expertise, plus newer fields aimed at AI answer engines (ChatGPT search, Perplexity, Claude search, Google AI Overviews) — `abstract` (a one-sentence quotable summary), `about` and `mentions` (entity disambiguation), `license`, `isAccessibleForFree`.
+- **Accessibility got serious.** Skip-to-content links, proper ARIA on the filter sidebar, keyboard navigation, `prefers-reduced-motion` respected throughout.
+- **No more accidental duplicate `<h1>` titles.** If a post author pastes the title at the top of the body, the engine quietly strips or downgrades it. The doctor blocks the integration if more than one H1 sneaks through.
+- **The "More articles" cards on a post page now look identical to the cards on `/blog/`.** Same component, same fallback image, same hover behaviour.
+- **The engine documents and ships an image sitemap, RSS auto-discovery, and explicit preconnect / DNS-prefetch hints.**
+
+Everything additive — existing sites picked these up by running `npm update @shipwreck/blog-core @shipwreck/blog-theme-default`. No migration. The full catalogue is in [FEATURES.md](FEATURES.md); the per-release detail is in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
