@@ -164,7 +164,7 @@ if [[ $CSS_SIZE_BYTES -lt 15000 ]]; then
 fi
 ok "Built CSS size sanity (${CSS_SIZE_BYTES} bytes — engine classes appear scanned)"
 
-REQUIRED_CLASSES=(max-w-7xl 'lg\\:grid-cols-3' rounded-card line-clamp-2 text-4xl font-heading not-prose 'lg\\:hidden')
+REQUIRED_CLASSES=(max-w-7xl 'lg\\:grid-cols-3' rounded-card line-clamp-2 max-h-48 text-4xl font-heading not-prose 'lg\\:hidden')
 for class in "${REQUIRED_CLASSES[@]}"; do
   if grep -q "$class" "$CSS_FILE"; then
     ok "CSS contains engine class: $class"
@@ -224,6 +224,40 @@ if [[ -f "$SITEMAP" ]] && grep -q "hello-world" "$SITEMAP"; then
   ok "Sitemap lists post URLs"
 else
   fail "Sitemap missing or doesn't list posts"
+fi
+
+# v0.3.13: /blog/ index has the filter sidebar + embedded manifest
+INDEX_HTML="$TEST_SITE/dist/index.html"
+if grep -q 'id="shipwreck-blog-filters"' "$INDEX_HTML"; then
+  ok "/blog/ index renders BlogFilters sidebar"
+else
+  fail "/blog/ index MISSING BlogFilters sidebar"
+fi
+if grep -q 'id="shipwreck-posts-manifest"' "$INDEX_HTML" && grep -q '"hello-world"' "$INDEX_HTML"; then
+  ok "/blog/ index embeds the posts manifest script tag"
+else
+  fail "/blog/ index MISSING embedded posts manifest"
+fi
+if grep -q 'id="shipwreck-search"' "$INDEX_HTML"; then
+  ok "BlogFilters renders the search input"
+else
+  fail "BlogFilters MISSING search input"
+fi
+if grep -q 'data-fallback-image' "$INDEX_HTML"; then
+  ok "Grid exposes data-fallback-image for client filter rendering"
+else
+  fail "Grid MISSING data-fallback-image attribute"
+fi
+# Paginated index (page/2/) should NOT show the filter sidebar — filters live
+# only on /blog/ to keep the static SSR path clean. Only meaningful if pagination
+# generated more than 1 page; with 3 demo posts + postsPerPage=10 it's a single
+# page, so this assertion is skipped when page/2/ doesn't exist.
+if [[ -f "$TEST_SITE/dist/page/2/index.html" ]]; then
+  if grep -q 'id="shipwreck-blog-filters"' "$TEST_SITE/dist/page/2/index.html"; then
+    fail "Paginated /blog/page/2/ should NOT render BlogFilters sidebar"
+  else
+    ok "Paginated index correctly omits BlogFilters sidebar"
+  fi
 fi
 
 # Admin page references the logo

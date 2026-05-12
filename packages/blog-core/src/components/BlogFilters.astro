@@ -1,0 +1,495 @@
+---
+/**
+ * /blog/ sidebar with live search + sort + tag/category chips. Pure
+ * progressive enhancement:
+ *
+ *   - The page is statically rendered with the paginated grid + <Pagination>
+ *     so crawlers and JS-off users see everything.
+ *   - On JS load, this component reads the embedded
+ *     <script id="shipwreck-posts-manifest" type="application/json"> and
+ *     takes over rendering of #shipwreck-card-grid based on filter state.
+ *   - URL is kept in sync via history.replaceState — sharable filtered
+ *     views, refresh preserves state, no back-button pollution.
+ *
+ * Search rules (per user spec): no filtering until query.length >= minSearchChars
+ * (default 3); once threshold met, every keystroke filters live (debounced).
+ * Clearing the input restores full set.
+ *
+ * Layout: on lg+ this renders as a sticky right-column. On mobile it
+ * collapses into a native <details> accordion (no JS for the toggle).
+ */
+import type { FilterFacets } from "../api/posts-manifest.js"
+import type { SiteConfig } from "../schemas/site.js"
+
+interface Props {
+  facets: FilterFacets
+  siteConfig: SiteConfig
+}
+
+const { facets, siteConfig } = Astro.props
+const cfg = siteConfig.listing?.filters ?? {}
+const showCategories = cfg.showCategories !== false && facets.categories.length > 0
+const showTags = cfg.showTags !== false && facets.tags.length > 0
+const showFeaturedToggle =
+  cfg.showFeaturedToggle === "always" ||
+  (cfg.showFeaturedToggle !== "never" && facets.featuredCount > 0)
+const heading = cfg.heading ?? "Filter"
+const minSearchChars = cfg.minSearchChars ?? 3
+const searchDebounceMs = cfg.searchDebounceMs ?? 120
+---
+
+<aside id="shipwreck-blog-filters" class="blog-filters not-prose lg:sticky lg:top-24">
+  <details class="rounded-card border border-border bg-bg-elevated shadow-card lg:open" open>
+    <summary class="cursor-pointer rounded-card p-4 font-heading text-sm font-bold uppercase tracking-wide text-primary marker:hidden [&::-webkit-details-marker]:hidden lg:pointer-events-none lg:[&::after]:hidden">
+      <span class="inline-flex items-center gap-2">
+        {heading}
+        <span
+          id="shipwreck-active-count"
+          class="hidden rounded-full bg-accent/15 px-2 py-0.5 text-[10px] text-accent"
+          aria-live="polite"
+        >0</span>
+      </span>
+    </summary>
+
+    <div class="space-y-5 border-t border-border p-4">
+      <!-- Search -->
+      <div class="filter-section">
+        <label
+          for="shipwreck-search"
+          class="mb-1 block text-xs font-bold uppercase tracking-wide text-muted"
+        >
+          Search
+        </label>
+        <input
+          id="shipwreck-search"
+          type="search"
+          placeholder="Search posts…"
+          autocomplete="off"
+          spellcheck="false"
+          class="w-full rounded-sm border border-border bg-bg/40 px-3 py-2 text-sm text-primary placeholder:text-muted/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-focus"
+          data-min-chars={String(minSearchChars)}
+          data-debounce-ms={String(searchDebounceMs)}
+        />
+        <p id="shipwreck-search-hint" class="mt-1 text-[11px] text-muted/70">
+          Min {minSearchChars} characters
+        </p>
+      </div>
+
+      <!-- Active filter chips (rendered by JS as filters get applied) -->
+      <div id="shipwreck-active-filters" class="hidden flex-wrap gap-1.5"></div>
+
+      <!-- Sort toggle -->
+      <div class="filter-section">
+        <h3 class="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted">Sort</h3>
+        <div class="flex rounded-sm border border-border bg-bg/40 p-0.5" role="radiogroup" aria-label="Sort posts by date">
+          <button
+            type="button"
+            data-sort="newest"
+            class="sort-btn flex-1 rounded-sm px-3 py-1.5 text-xs font-semibold text-muted transition-colors aria-pressed:bg-accent aria-pressed:text-bg"
+            aria-pressed="true"
+          >
+            Newest
+          </button>
+          <button
+            type="button"
+            data-sort="oldest"
+            class="sort-btn flex-1 rounded-sm px-3 py-1.5 text-xs font-semibold text-muted transition-colors aria-pressed:bg-accent aria-pressed:text-bg"
+            aria-pressed="false"
+          >
+            Oldest
+          </button>
+        </div>
+      </div>
+
+      {showCategories && (
+        <div class="filter-section">
+          <h3 class="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted">Categories</h3>
+          <div class="flex flex-wrap gap-1.5">
+            {facets.categories.map((c) => (
+              <button
+                type="button"
+                data-filter-cat={c.slug}
+                aria-pressed="false"
+                class="filter-chip inline-flex items-center gap-1 rounded-chip border border-border bg-bg/40 px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:border-accent/60 aria-pressed:border-accent aria-pressed:bg-accent/10 aria-pressed:text-accent"
+              >
+                <span>{c.slug}</span>
+                <span class="text-[10px] text-muted/60 aria-pressed:text-accent/70">({c.count})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showTags && (
+        <div class="filter-section">
+          <h3 class="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted">Tags</h3>
+          <div class="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto pr-1">
+            {facets.tags.map((t) => (
+              <button
+                type="button"
+                data-filter-tag={t.slug}
+                aria-pressed="false"
+                class="filter-chip inline-flex items-center gap-1 rounded-chip border border-border bg-bg/40 px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:border-accent/60 aria-pressed:border-accent aria-pressed:bg-accent/10 aria-pressed:text-accent"
+              >
+                <span>{t.slug}</span>
+                <span class="text-[10px] text-muted/60 aria-pressed:text-accent/70">({t.count})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showFeaturedToggle && (
+        <div class="filter-section">
+          <label class="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted">
+            <input
+              id="shipwreck-featured-toggle"
+              type="checkbox"
+              class="h-3.5 w-3.5 rounded-sm border-border accent-accent"
+            />
+            <span>Featured only</span>
+          </label>
+        </div>
+      )}
+
+      <button
+        type="button"
+        id="shipwreck-clear-filters"
+        class="hidden w-full rounded-button border border-border bg-bg/40 px-3 py-2 text-xs font-bold uppercase tracking-wide text-muted transition-colors hover:border-accent hover:text-accent"
+      >
+        Clear filters
+      </button>
+    </div>
+  </details>
+
+  {siteConfig.listing?.sidebar?.showRss !== false && (
+    <p class="mt-4 text-center text-xs text-muted">
+      <a href={`${siteConfig.blogBasePath.replace(/\/$/, "")}/rss.xml`} class="hover:text-accent">
+        Subscribe via RSS →
+      </a>
+    </p>
+  )}
+</aside>
+
+<style>
+  /* Force the <details> open on lg+ — the summary becomes a non-interactive header. */
+  @media (min-width: 1024px) {
+    #shipwreck-blog-filters details { display: block; }
+    #shipwreck-blog-filters details > summary {
+      list-style: none;
+      pointer-events: none;
+    }
+    #shipwreck-blog-filters details > summary::-webkit-details-marker { display: none; }
+    /* Force the panel visible regardless of [open] state on lg+. */
+    #shipwreck-blog-filters details > :not(summary) { display: block !important; }
+  }
+
+  /* Stable focus ring for keyboard nav across all interactive elements. */
+  #shipwreck-blog-filters button:focus-visible,
+  #shipwreck-blog-filters input:focus-visible {
+    outline: 2px solid var(--color-focus-ring, #2563eb);
+    outline-offset: 2px;
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    // Defer hookup until the embedded manifest exists. Re-binds on
+    // astro:page-load so view-transitions don't break the filter.
+    function init() {
+      const manifestEl = document.getElementById("shipwreck-posts-manifest")
+      const grid = document.getElementById("shipwreck-card-grid")
+      const filtersRoot = document.getElementById("shipwreck-blog-filters")
+      if (!manifestEl || !grid || !filtersRoot) return
+      if (grid.dataset.shipwreckFilterBound === "1") return
+      grid.dataset.shipwreckFilterBound = "1"
+
+      let manifest
+      try { manifest = JSON.parse(manifestEl.textContent || "{}") } catch { return }
+      const allPosts = (manifest.posts || []).map((p) => ({
+        ...p,
+        tags: p.tags || [],
+        _searchHaystack: [
+          p.title || "",
+          p.excerpt || "",
+          p.category || "",
+          (p.tags || []).join(" "),
+          p.author || "",
+        ].join(" ").toLowerCase(),
+      }))
+
+      const basePath = (manifest.blogBasePath || "/blog").replace(/\/$/, "")
+      const fallbackImage = grid.dataset.fallbackImage || ""
+      const blogBaseHref = basePath + "/"
+      const loadMoreBtn = document.getElementById("shipwreck-load-more")
+      const paginationEl = document.querySelector('nav[aria-label="Pagination"]')
+
+      const searchInput = document.getElementById("shipwreck-search")
+      const featuredToggle = document.getElementById("shipwreck-featured-toggle")
+      const clearBtn = document.getElementById("shipwreck-clear-filters")
+      const activeFiltersEl = document.getElementById("shipwreck-active-filters")
+      const activeCountEl = document.getElementById("shipwreck-active-count")
+      const minChars = parseInt(searchInput?.dataset.minChars || "3", 10)
+      const debounceMs = parseInt(searchInput?.dataset.debounceMs || "120", 10)
+
+      const state = { q: "", sort: "newest", tags: new Set(), cats: new Set(), featured: false }
+
+      // ----- URL state -----
+      function readUrlState() {
+        const params = new URLSearchParams(window.location.search)
+        state.q = params.get("q") || ""
+        state.sort = params.get("sort") === "oldest" ? "oldest" : "newest"
+        state.tags = new Set((params.get("tag") || "").split(",").filter(Boolean))
+        state.cats = new Set((params.get("cat") || "").split(",").filter(Boolean))
+        state.featured = params.get("featured") === "1"
+      }
+      function writeUrlState() {
+        const params = new URLSearchParams()
+        if (state.q) params.set("q", state.q)
+        if (state.sort === "oldest") params.set("sort", "oldest")
+        if (state.tags.size) params.set("tag", Array.from(state.tags).join(","))
+        if (state.cats.size) params.set("cat", Array.from(state.cats).join(","))
+        if (state.featured) params.set("featured", "1")
+        const qs = params.toString()
+        const url = window.location.pathname + (qs ? "?" + qs : "")
+        history.replaceState(null, "", url)
+      }
+
+      // ----- Filtering -----
+      function applyFilters() {
+        let r = allPosts
+        if (state.q.length >= minChars) {
+          const q = state.q.toLowerCase()
+          r = r.filter((p) => p._searchHaystack.includes(q))
+        }
+        if (state.cats.size) r = r.filter((p) => p.category && state.cats.has(p.category))
+        if (state.tags.size) {
+          r = r.filter((p) => (p.tags || []).some((t) => state.tags.has(t)))
+        }
+        if (state.featured) r = r.filter((p) => p.featured)
+        const cmp = state.sort === "oldest"
+          ? (a, b) => a.publishDate.localeCompare(b.publishDate)
+          : (a, b) => b.publishDate.localeCompare(a.publishDate)
+        return r.slice().sort(cmp)
+      }
+
+      // ----- Card template (mirrors PostCard variant="card") -----
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+        }[c]))
+      }
+      function escapeAttr(s) { return escapeHtml(s) }
+      function formatDate(iso) {
+        try {
+          return new Date(iso + "T00:00:00Z").toLocaleDateString("en-AU", {
+            year: "numeric", month: "long", day: "numeric",
+          })
+        } catch { return iso }
+      }
+      function cardHTML(p) {
+        const href = `${basePath}/${p.id}/`
+        const image = p.featuredImage || fallbackImage
+        const isFallback = !p.featuredImage && !!image
+        const altText = p.featuredImageAlt || (isFallback ? "" : p.title)
+        const imageBlock = `
+          <div class="aspect-[16/9] w-full overflow-hidden bg-bg/40">
+            ${image ? `<img src="${escapeAttr(image)}" alt="${escapeAttr(altText)}"${isFallback ? ' aria-hidden="true"' : ""} class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" />` : ""}
+          </div>`
+        const dateLabel = formatDate(p.publishDate)
+        const categoryLine = p.category ? ` &middot; ${escapeHtml(p.category)}` : ""
+        return `
+          <article class="group flex h-full flex-col overflow-hidden rounded-card border border-border bg-bg-elevated shadow-card transition-colors hover:border-accent/60">
+            <a href="${escapeAttr(href)}" class="flex h-full flex-col">
+              ${imageBlock}
+              <div class="flex flex-1 flex-col p-5">
+                <h3 class="font-heading text-lg font-semibold leading-snug text-primary group-hover:text-accent">${escapeHtml(p.title)}</h3>
+                ${p.excerpt ? `<p class="mt-2 text-sm leading-relaxed text-muted">${escapeHtml(p.excerpt)}</p>` : ""}
+                <p class="mt-auto pt-4 text-xs uppercase tracking-wide text-muted/80">
+                  <time datetime="${escapeAttr(p.publishDate)}">${dateLabel}</time>${categoryLine}
+                </p>
+              </div>
+            </a>
+          </article>`
+      }
+
+      function noResultsHTML() {
+        return `
+          <div class="col-span-full rounded-card border border-dashed border-border bg-bg-elevated p-10 text-center">
+            <p class="text-sm text-muted">No posts match your filters.</p>
+            <button type="button" id="shipwreck-clear-inline" class="mt-4 rounded-button border border-border px-4 py-2 text-xs font-bold uppercase tracking-wide text-muted hover:border-accent hover:text-accent">Clear filters</button>
+          </div>`
+      }
+
+      function activeFilterCount() {
+        return (
+          (state.q.length >= minChars ? 1 : 0) +
+          (state.sort === "oldest" ? 1 : 0) +
+          state.tags.size +
+          state.cats.size +
+          (state.featured ? 1 : 0)
+        )
+      }
+
+      // ----- Active chip strip -----
+      function renderActiveChips() {
+        if (!activeFiltersEl) return
+        const chips = []
+        if (state.q.length >= minChars) chips.push({ kind: "q", label: `"${state.q}"`, key: "q" })
+        if (state.sort === "oldest") chips.push({ kind: "sort", label: "Oldest first", key: "sort" })
+        state.cats.forEach((c) => chips.push({ kind: "cat", label: c, key: c }))
+        state.tags.forEach((t) => chips.push({ kind: "tag", label: t, key: t }))
+        if (state.featured) chips.push({ kind: "featured", label: "Featured", key: "featured" })
+
+        if (chips.length === 0) {
+          activeFiltersEl.classList.add("hidden")
+          activeFiltersEl.classList.remove("flex")
+          activeFiltersEl.innerHTML = ""
+          return
+        }
+        activeFiltersEl.classList.remove("hidden")
+        activeFiltersEl.classList.add("flex")
+        activeFiltersEl.innerHTML = chips
+          .map((c) => `<button type="button" data-active-chip-kind="${c.kind}" data-active-chip-key="${escapeAttr(c.key)}" class="inline-flex items-center gap-1 rounded-chip bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent hover:bg-accent/25">× ${escapeHtml(c.label)}</button>`)
+          .join("")
+      }
+
+      // ----- Re-render -----
+      function render() {
+        const filtersActive = activeFilterCount() > 0
+        if (filtersActive) {
+          // JS takes over: hide load-more + pagination (filtering is client-only now)
+          if (loadMoreBtn) loadMoreBtn.style.display = "none"
+          if (paginationEl) paginationEl.style.display = "none"
+          const matched = applyFilters()
+          if (matched.length === 0) {
+            grid.innerHTML = noResultsHTML()
+          } else {
+            grid.innerHTML = matched.map(cardHTML).join("")
+          }
+        } else {
+          // No filters — render full set newest-first (or oldest depending on sort).
+          // With sort=newest this matches the static SSR'd grid; with sort=oldest
+          // we still need JS to re-render in reverse order.
+          if (state.sort === "oldest") {
+            const all = applyFilters()
+            grid.innerHTML = all.map(cardHTML).join("")
+            if (loadMoreBtn) loadMoreBtn.style.display = "none"
+            if (paginationEl) paginationEl.style.display = "none"
+          } else {
+            // Restore the static SSR cards by reloading their HTML via the manifest.
+            // (Faster than refetching the page.)
+            const all = applyFilters()
+            grid.innerHTML = all.map(cardHTML).join("")
+            if (loadMoreBtn) loadMoreBtn.style.display = ""
+            if (paginationEl) paginationEl.style.display = ""
+          }
+        }
+        // Show / hide clear button + active count badge.
+        const count = activeFilterCount()
+        if (clearBtn) clearBtn.classList.toggle("hidden", count === 0)
+        if (activeCountEl) {
+          activeCountEl.classList.toggle("hidden", count === 0)
+          activeCountEl.textContent = String(count)
+        }
+        renderActiveChips()
+        syncChipStates()
+        writeUrlState()
+      }
+
+      function syncChipStates() {
+        filtersRoot.querySelectorAll("[data-filter-tag]").forEach((btn) => {
+          btn.setAttribute("aria-pressed", state.tags.has(btn.dataset.filterTag) ? "true" : "false")
+        })
+        filtersRoot.querySelectorAll("[data-filter-cat]").forEach((btn) => {
+          btn.setAttribute("aria-pressed", state.cats.has(btn.dataset.filterCat) ? "true" : "false")
+        })
+        filtersRoot.querySelectorAll("[data-sort]").forEach((btn) => {
+          btn.setAttribute("aria-pressed", btn.dataset.sort === state.sort ? "true" : "false")
+        })
+        if (featuredToggle) featuredToggle.checked = state.featured
+        if (searchInput && searchInput.value !== state.q) searchInput.value = state.q
+      }
+
+      // ----- Event wiring -----
+      let searchTimer = null
+      if (searchInput) {
+        searchInput.addEventListener("input", (e) => {
+          const v = e.target.value
+          if (searchTimer) clearTimeout(searchTimer)
+          searchTimer = setTimeout(() => {
+            state.q = v
+            render()
+          }, debounceMs)
+        })
+      }
+
+      filtersRoot.querySelectorAll("[data-filter-tag]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const t = btn.dataset.filterTag
+          if (state.tags.has(t)) state.tags.delete(t); else state.tags.add(t)
+          render()
+        })
+      })
+      filtersRoot.querySelectorAll("[data-filter-cat]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const c = btn.dataset.filterCat
+          if (state.cats.has(c)) state.cats.delete(c); else state.cats.add(c)
+          render()
+        })
+      })
+      filtersRoot.querySelectorAll("[data-sort]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.sort = btn.dataset.sort
+          render()
+        })
+      })
+      if (featuredToggle) {
+        featuredToggle.addEventListener("change", () => {
+          state.featured = !!featuredToggle.checked
+          render()
+        })
+      }
+      function clearAll() {
+        state.q = ""; state.sort = "newest"; state.tags.clear(); state.cats.clear(); state.featured = false
+        if (searchInput) searchInput.value = ""
+        render()
+      }
+      if (clearBtn) clearBtn.addEventListener("click", clearAll)
+      document.addEventListener("click", (e) => {
+        const t = e.target
+        if (!(t instanceof Element)) return
+        if (t.id === "shipwreck-clear-inline") clearAll()
+        const chip = t.closest("[data-active-chip-kind]")
+        if (chip) {
+          const kind = chip.getAttribute("data-active-chip-kind")
+          const key = chip.getAttribute("data-active-chip-key")
+          if (kind === "q") { state.q = ""; if (searchInput) searchInput.value = "" }
+          else if (kind === "sort") state.sort = "newest"
+          else if (kind === "cat") state.cats.delete(key)
+          else if (kind === "tag") state.tags.delete(key)
+          else if (kind === "featured") state.featured = false
+          render()
+        }
+      })
+
+      // Initial paint — restore from URL.
+      readUrlState()
+      // Only paint immediately if the URL has filters; otherwise leave the
+      // SSR'd HTML in place to avoid a flicker.
+      if (activeFilterCount() > 0 || state.sort === "oldest") {
+        render()
+      } else {
+        syncChipStates()
+        renderActiveChips()
+      }
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init)
+    } else {
+      init()
+    }
+    document.addEventListener("astro:page-load", init)
+  })()
+</script>

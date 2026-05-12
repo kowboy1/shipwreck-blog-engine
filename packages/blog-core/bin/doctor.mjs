@@ -854,11 +854,11 @@ if (!SKIP_BUILD) {
       fail("Built dist has no CSS files", `Expected at least one .css under ${distCssDir}`)
     } else {
       const allCss = cssFiles.map((f) => readFileSync(join(distCssDir, f), "utf8")).join("\n")
-      // Sentinel utility classes from engine page renderers. Updated for v0.3.12:
-      // line-clamp-2 is used by PopularPosts.astro for title truncation in mini
-      // cards — guards against the sidebar widget being tree-shaken if
-      // Tailwind can't see the engine pages/ + components/ dir.
-      const expected = ["max-w-7xl", "lg\\:grid-cols-3", "rounded-card", "line-clamp-2", "text-4xl", "font-heading", "lg\\:hidden", "hidden", "not-prose"]
+      // Sentinel utility classes from engine page renderers. Updated for v0.3.13:
+      // max-h-48 is the BlogFilters tag-scroll container — guards against the
+      // filter sidebar being tree-shaken if Tailwind can't see the engine
+      // components/ dir.
+      const expected = ["max-w-7xl", "lg\\:grid-cols-3", "rounded-card", "line-clamp-2", "max-h-48", "text-4xl", "font-heading", "lg\\:hidden", "hidden", "not-prose"]
       const missing = expected.filter((cls) => !allCss.includes(cls))
       if (missing.length > 0) {
         fail(

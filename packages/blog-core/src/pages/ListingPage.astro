@@ -9,6 +9,13 @@
  * cross-page navigation and a "Load more" button that fetches the next
  * paginated page and appends its cards into the grid without a full reload.
  *
+ * On the un-paginated index (/blog/) — when data.showFilters is true — a
+ * filter sidebar is rendered alongside the grid. Filters are pure
+ * progressive enhancement: the static SSR'd grid + pagination still works
+ * for crawlers and JS-off users; the embedded
+ * <script id="shipwreck-posts-manifest"> drives client-side filtering
+ * without an extra HTTP fetch.
+ *
  * Per-site usage stays unchanged:
  *   const data = prepareTagPage({ tag, posts, siteConfig })
  *   <BaseLayout meta={data.meta} jsonLd={data.jsonLd}>
@@ -22,6 +29,7 @@ import Breadcrumbs from "../components/Breadcrumbs.astro"
 import PostCard from "../components/PostCard.astro"
 import Pagination from "../components/Pagination.astro"
 import AuthorBio from "../components/AuthorBio.astro"
+import BlogFilters from "../components/BlogFilters.astro"
 
 interface Props {
   data: ListingPageData
@@ -29,17 +37,18 @@ interface Props {
 }
 
 const { data, siteConfig } = Astro.props
-const { title, subtitle, crumbs, posts, pagination, author } = data
+const { title, subtitle, crumbs, posts, pagination, author, filterManifest, filterFacets, showFilters } = data
 const fallbackImage = siteConfig.cards?.fallbackImage
 const loadMoreEnabled = siteConfig.cards?.loadMore !== false
 const base = siteConfig.blogBasePath.replace(/\/$/, "")
 const hasMorePages = !!pagination && pagination.current < pagination.total
 const nextPageUrl = hasMorePages ? `${base}/page/${pagination!.current + 1}/` : ""
+const filtersActive = showFilters === true && !!filterFacets && !!filterManifest
 ---
 
 <ClientRouter />
 
-<div class="mx-auto max-w-7xl">
+<div class:list={["mx-auto", filtersActive ? "max-w-7xl listing-with-filters" : "max-w-7xl"]}>
   {crumbs.length > 0 && <Breadcrumbs items={crumbs} />}
 
   <h1 class={`font-heading text-4xl font-bold text-primary${crumbs.length > 0 ? " mt-4" : ""}`}>
@@ -55,57 +64,104 @@ const nextPageUrl = hasMorePages ? `${base}/page/${pagination!.current + 1}/` : 
     />
   )}
 
-  {posts.length === 0 ? (
-    <p class="mt-10 text-muted">No posts here yet.</p>
-  ) : (
-    <div
-      id="shipwreck-card-grid"
-      data-current-page={pagination?.current ?? 1}
-      data-total-pages={pagination?.total ?? 1}
-      class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      {posts.map((post) => (
-        <PostCard
-          post={post}
+  <div class:list={[filtersActive ? "listing-grid mt-8" : "mt-0"]}>
+    <div class="listing-main">
+      {posts.length === 0 ? (
+        <p class="mt-10 text-muted">No posts here yet.</p>
+      ) : (
+        <div
+          id="shipwreck-card-grid"
+          data-current-page={pagination?.current ?? 1}
+          data-total-pages={pagination?.total ?? 1}
+          data-fallback-image={fallbackImage ?? ""}
+          class={filtersActive
+            ? "grid gap-6 sm:grid-cols-2 xl:grid-cols-3"
+            : "mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"}
+        >
+          {posts.map((post) => (
+            <PostCard
+              post={post}
+              basePath={siteConfig.blogBasePath}
+              variant="card"
+              fallbackImage={fallbackImage}
+            />
+          ))}
+        </div>
+      )}
+
+      {hasMorePages && loadMoreEnabled && (
+        <div class="mt-10 flex justify-center">
+          <button
+            type="button"
+            id="shipwreck-load-more"
+            data-next-url={nextPageUrl}
+            class="rounded-button border border-border bg-bg-elevated px-6 py-3 text-sm font-semibold uppercase tracking-wide text-primary shadow-card transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Load more
+          </button>
+        </div>
+      )}
+
+      {pagination && (
+        <Pagination
+          current={pagination.current}
+          total={pagination.total}
           basePath={siteConfig.blogBasePath}
-          variant="card"
-          fallbackImage={fallbackImage}
         />
-      ))}
+      )}
     </div>
-  )}
 
-  {hasMorePages && loadMoreEnabled && (
-    <div class="mt-10 flex justify-center">
-      <button
-        type="button"
-        id="shipwreck-load-more"
-        data-next-url={nextPageUrl}
-        class="rounded-button border border-border bg-bg-elevated px-6 py-3 text-sm font-semibold uppercase tracking-wide text-primary shadow-card transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        Load more
-      </button>
-    </div>
-  )}
-
-  {pagination && (
-    <Pagination
-      current={pagination.current}
-      total={pagination.total}
-      basePath={siteConfig.blogBasePath}
-    />
-  )}
+    {filtersActive && (
+      <div class="listing-aside">
+        <BlogFilters facets={filterFacets!} siteConfig={siteConfig} />
+      </div>
+    )}
+  </div>
 </div>
+
+{filtersActive && (
+  <script
+    id="shipwreck-posts-manifest"
+    type="application/json"
+    is:inline
+    set:html={JSON.stringify(filterManifest)}
+  />
+)}
+
+<style>
+  .listing-grid {
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "aside"
+      "main";
+  }
+  .listing-main { grid-area: main; min-width: 0; }
+  .listing-aside { grid-area: aside; }
+
+  @media (min-width: 1024px) {
+    .listing-grid {
+      grid-template-columns: minmax(0, 1fr) 280px;
+      grid-template-areas: "main aside";
+      gap: 2.5rem;
+    }
+  }
+</style>
 
 <script>
   // Load-more: fetch the next static page (already pre-rendered), pull its grid
   // children out of the response, and append them into the current grid.
   // Preserves SEO (the paginated URLs still exist + still get indexed) while
   // giving the visitor a no-reload experience. Re-binds on Astro view transitions.
+  //
+  // No-op when the BlogFilters script has taken over the grid — filtering is
+  // client-side from the embedded manifest, so paginated fetches aren't needed.
   function initLoadMore() {
     const btn = document.getElementById("shipwreck-load-more") as HTMLButtonElement | null
     const grid = document.getElementById("shipwreck-card-grid")
     if (!btn || !grid) return
+    if (grid.dataset.shipwreckFilterBound === "1") return
 
     btn.addEventListener("click", async () => {
       const nextUrl = btn.dataset.nextUrl

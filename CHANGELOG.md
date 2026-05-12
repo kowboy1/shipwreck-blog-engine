@@ -8,6 +8,104 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.13] - 2026-05-12
+
+Live filter + search sidebar on `/blog/`. Pure client-side, no page reload, no extra HTTP fetch — all filter state runs against an embedded post manifest. Static SSR'd grid + `<Pagination>` remains intact so crawlers and JS-off users keep seeing everything.
+
+### Added: `<BlogFilters>` component
+
+Right-column sidebar on `/blog/` containing:
+
+- **Search** — `<input type="search">`, debounced (default 120ms), starts filtering at `minSearchChars` (default 3). Clearing the box restores the full set. Searches `title + excerpt + category + tags + author`.
+- **Sort toggle** — Newest / Oldest, `aria-pressed` chip pair.
+- **Categories** — multi-select chips with usage counts ("Surf (2)"). OR logic: post matches any selected category.
+- **Tags** — multi-select chips with usage counts. Scrollable (`max-h-48`) when many. OR logic.
+- **Featured only** — checkbox, only renders when at least one post has `featured: true` (configurable via `listing.filters.showFeaturedToggle: "auto" | "always" | "never"`).
+- **Active filter chips** — strip of removable chips under the search box, showing what's currently applied.
+- **Clear filters button** — only visible when ≥1 filter is active. Resets all state.
+- **RSS link** — small footer link to `/blog/rss.xml` (toggle via `listing.sidebar.showRss`).
+
+### Mobile / desktop layout
+
+Native `<details>` element drives mobile collapse — works with zero JS for the toggle. On lg+ the panel is forced open via CSS (`display: block !important` on the panel; summary loses pointer-events). On mobile a "Filter" header with active-count badge expands the panel. Search input stays inside the collapsed panel; an active filter shows the badge so users always know filters are applied even when collapsed.
+
+### Live filtering without reload
+
+- ListingPage embeds the entire post manifest inline:
+  ```html
+  <script id="shipwreck-posts-manifest" type="application/json">{...}</script>
+  ```
+  No fetch needed on first interaction. The grid also exposes `data-fallback-image` so the JS card template uses the same fallback as the SSR'd cards.
+- On any filter activity the JS takes over `#shipwreck-card-grid`, re-renders matching cards (template mirrors `PostCard variant="card"`), hides `<Pagination>` + the Load-more button (irrelevant when filters are active).
+- **URL state** synced via `history.replaceState`:
+  ```
+  /blog/?q=radar&sort=oldest&tag=surf,wind&cat=guides&featured=1
+  ```
+  Sharable filtered views, refresh preserves state, no back-button pollution. Canonical stays `/blog/` regardless of query params (SEO-safe — query strings don't fragment indexing).
+- **No-results state** — friendly empty card with inline Clear filters button.
+- **Search rule** matches the spec exactly: silent below `minSearchChars`, live on every keystroke once at threshold, instant restore on clear.
+
+### Added: `siteConfig.listing.*`
+
+```ts
+listing: {
+  filters: {
+    enabled: true,
+    showCategories: true,
+    showTags: true,
+    showFeaturedToggle: "auto",   // "auto" | "always" | "never"
+    minSearchChars: 3,
+    searchDebounceMs: 120,
+    heading: "Filter",
+  },
+  sidebar: {
+    showRss: true,
+    showPopular: false,           // reserved for future Popular-this-month widget
+    popularLimit: 3,
+  }
+}
+```
+
+All defaults applied — no consumer config required to get the sidebar working.
+
+### Added: `buildPostsManifest()` + `buildFilterFacets()` engine helpers
+
+`@shipwreck/blog-core/api/posts-manifest`:
+- `buildPostsManifest({ posts, siteConfig })` — canonical JSON shape for `/blog/posts.json` AND the inline filter manifest. Centralised so future field additions (`featuredImage`, etc.) ship through `npm update` instead of per-site patches. Consumer `src/pages/posts.json.ts` shrinks to a 5-line wrapper.
+- `buildFilterFacets({ posts })` — computes tag/category occurrence counts + featured count for chip rendering.
+
+### `prepareIndexPage` now accepts `allPosts`
+
+The un-paginated `/blog/` index needs the full post list (for the filter manifest + facets) even though it only displays `postsPerPage`. New `allPosts?: PostEntry[]` parameter — pass the full sorted list; the existing `posts` parameter is the slice to render. Legacy callers (just `posts`) keep working — `allPosts` falls back to `posts`. Paginated pages (`/blog/page/N/`) deliberately omit the manifest so static-SSR'd paginated URLs stay light.
+
+### Doctor + integration test
+
+- `max-h-48` added to sentinel CSS class list — guards against the filter sidebar being tree-shaken if Tailwind can't see the engine `components/` dir.
+- Integration test: **54/54** (5 new assertions on BlogFilters sidebar, embedded manifest script tag, search input, grid `data-fallback-image`, and paginated pages correctly omitting filters).
+
+### Migration from 0.3.12
+
+Consumer `src/pages/index.astro` should pass `allPosts: sorted` to `prepareIndexPage` to enable filtering:
+
+```ts
+const data = prepareIndexPage({
+  posts: sorted.slice(0, perPage),
+  allPosts: sorted,                  // NEW — required for filter manifest
+  siteConfig, page: 1, total,
+})
+```
+
+Without this, the listing still renders identically to 0.3.12 (no sidebar, no manifest) — filter feature is opt-in via that one-line addition.
+
+Optionally, consumer `src/pages/posts.json.ts` can simplify to use `buildPostsManifest`:
+
+```ts
+import { buildPostsManifest } from "@shipwreck/blog-core"
+const manifest = buildPostsManifest({ posts, siteConfig })
+```
+
+— picks up future `featuredImage` / `featuredImageAlt` fields automatically.
+
 ## [0.3.12] - 2026-05-12
 
 "Popular articles" sidebar widget on post pages. Analytics-driven when a `.shipwreck/popularity.json` file is present; falls back to most-recent posts so the widget never renders empty. Engine stays analytics-provider-agnostic — popularity data is produced out-of-band by a per-site script that hits whichever analytics API the site uses. Reference Cloudflare Web Analytics producer ships with the engine.

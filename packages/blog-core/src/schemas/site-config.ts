@@ -80,6 +80,38 @@ export const siteConfigSchema = z.object({
    * Entries are slugs (no .mdx) — same form as filenames in src/content/posts/.
    */
   featuredPostsForSidebar: z.array(z.string()).optional(),
+
+  /**
+   * Per-site config for the /blog/ listing page (filter sidebar + extras).
+   * All defaults are SEO-safe: static HTML still renders the paginated grid
+   * for crawlers; filters are progressive-enhancement only.
+   */
+  listing: z
+    .object({
+      filters: z
+        .object({
+          enabled: z.boolean().default(true),
+          showCategories: z.boolean().default(true),
+          showTags: z.boolean().default(true),
+          /** "auto" — only render the toggle if any post has featured:true. */
+          showFeaturedToggle: z.enum(["auto", "always", "never"]).default("auto"),
+          /** Minimum query length before the search input starts filtering. */
+          minSearchChars: z.number().int().positive().default(3),
+          /** Debounce milliseconds for the search input. */
+          searchDebounceMs: z.number().int().nonnegative().default(120),
+          heading: z.string().default("Filter"),
+        })
+        .default({}),
+      sidebar: z
+        .object({
+          showRss: z.boolean().default(true),
+          /** Show a "Popular this month" mini-list under the filters. */
+          showPopular: z.boolean().default(false),
+          popularLimit: z.number().int().positive().default(3),
+        })
+        .default({}),
+    })
+    .default({}),
 })
 
 export type SiteConfig = z.infer<typeof siteConfigSchema>

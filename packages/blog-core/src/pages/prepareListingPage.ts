@@ -15,6 +15,7 @@ import {
   organizationSchema,
   type MetaTags,
 } from "../seo/index.js"
+import { buildPostsManifest, buildFilterFacets, type PostsManifest, type FilterFacets } from "../api/posts-manifest.js"
 
 interface PostEntry {
   id: string
@@ -38,6 +39,21 @@ export interface ListingPageData {
   meta: MetaTags
   /** JSON-LD graph */
   jsonLd: object | object[]
+  /**
+   * Inline manifest of every published post — embedded as a script tag on
+   * the page so client-side filtering can run without an HTTP fetch.
+   * Only set on the un-paginated index (`/blog/`) since that's where the
+   * filter sidebar lives. Tag/category pages don't get this.
+   */
+  filterManifest?: PostsManifest
+  /**
+   * Filter facets (tag/category counts + featured count) for rendering
+   * filter chips with usage frequencies ("Surf (2)"). Only set on the
+   * un-paginated index.
+   */
+  filterFacets?: FilterFacets
+  /** When true, the page should render the filter sidebar + embedded manifest. */
+  showFilters?: boolean
 }
 
 function virtualPost(title: string, description: string): Post {
@@ -88,12 +104,16 @@ function buildListingMeta(input: {
 }
 
 export function prepareIndexPage(input: {
+  /** Posts to RENDER on this page (the slice for the current pagination cursor) */
   posts: PostEntry[]
+  /** ALL published posts — used to build the filter manifest + facets. Falls back to `posts` if omitted (legacy callers). */
+  allPosts?: PostEntry[]
   siteConfig: SiteConfig
   page?: number
   total?: number
 }): ListingPageData {
-  const { posts, siteConfig, page, total } = input
+  const { posts, allPosts, siteConfig, page, total } = input
+  const fullList = allPosts ?? posts
   const isPaged = page !== undefined && page > 1
   const url = new URL(
     isPaged
@@ -108,6 +128,13 @@ export function prepareIndexPage(input: {
     : `Latest posts from ${siteConfig.siteName}`
 
   const pagination = total !== undefined ? { current: page ?? 1, total } : undefined
+
+  // Filter manifest + facets — only on the un-paginated index. Pagination
+  // pages skip these because the sidebar lives at /blog/ only.
+  const showFilters = !isPaged && siteConfig.listing?.filters?.enabled !== false
+  const filterManifest = showFilters ? buildPostsManifest({ posts: fullList, siteConfig }) : undefined
+  const filterFacets = showFilters ? buildFilterFacets({ posts: fullList }) : undefined
+
   return {
     title,
     crumbs: [],
@@ -123,6 +150,9 @@ export function prepareIndexPage(input: {
         : undefined,
     }),
     jsonLd: organizationSchema(siteConfig),
+    ...(filterManifest ? { filterManifest } : {}),
+    ...(filterFacets ? { filterFacets } : {}),
+    showFilters,
   }
 }
 
