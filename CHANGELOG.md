@@ -8,6 +8,61 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-05-13
+
+GEO (Generative Engine Optimization) field set + site-level schema opt-out flags for clean coexistence with a parent site that already emits its own Organization/WebSite (e.g. a Keel-hosted site).
+
+### Added: GEO-specific Article JSON-LD fields
+
+Optional post frontmatter that flows into `Article` JSON-LD. AI answer engines (ChatGPT search, Perplexity, Claude search, Google AI Overviews, Bing Copilot) use these signals to decide whether to cite the post — and what to quote:
+
+```yaml
+abstract: "One-sentence, self-contained summary. AI answer engines often quote this verbatim."
+about:
+  - "Wollongong rain radar"
+  - "Bureau of Meteorology"
+mentions:
+  - "Astro 5"
+  - "static site generation"
+license: "https://creativecommons.org/licenses/by/4.0/"
+copyrightHolder: "Some Publisher Pty Ltd"   # defaults to siteConfig.brand.organizationName
+isAccessibleForFree: false                     # default true; set false for paywall / member-only
+```
+
+`articleSchema()` emits:
+- `abstract` — when set
+- `about[]` — as bare `{ @type: Thing, name: ... }` entities for LLM disambiguation
+- `mentions[]` — same shape, secondary references
+- `license` — full URL
+- `copyrightHolder` — `Organization` node, defaults to brand
+- `isAccessibleForFree` — emitted on every post, default `true` (paywall signal for AI crawlers)
+
+### Added: `seo.emitOrganizationSchema` opt-out (default true)
+
+When `false`, the engine omits the `Organization` JSON-LD block from listing pages. Use case: the host site (e.g. Keel) already emits sitewide `Organization` — engine should NOT duplicate it.
+
+### Added: `seo.emitWebsiteSchema` opt-in (default false)
+
+When `true`, the engine emits a `WebSite` JSON-LD block on listing pages. Default off because most host sites emit it sitewide. Standalone blog deployments where the engine is the only schema producer should turn this on.
+
+### Added: `websiteSchema()` helper
+
+`@shipwreck/blog-core/seo/schema-org` — new exported builder for the optional `WebSite` JSON-LD (`name`, `url`, `inLanguage`, `publisher`). Used by `prepareIndexPage` when `emitWebsiteSchema: true`.
+
+### Integration test: 89/89 (7 new assertions)
+
+- Article JSON-LD includes `abstract`, `about[]` Thing entities, `mentions[]` Thing entities, `copyrightHolder`, `isAccessibleForFree`, `license`
+- Default `emitOrganizationSchema: true` keeps `Organization` on `/blog/` index
+
+### Schema additions
+
+- `post.ts`: `abstract?`, `about[]?`, `mentions[]?`, `copyrightHolder?`, `license?`, `isAccessibleForFree` (default true)
+- `site-config.ts`: `seo.emitOrganizationSchema` (default true), `seo.emitWebsiteSchema` (default false)
+
+### Migration from 0.4.0
+
+None required. All additions are opt-in via frontmatter. The default emission behaviour matches 0.4.0 exactly (Organization on listing pages, no WebSite). Sites coexisting with a Keel parent should set `siteConfig.seo.emitOrganizationSchema: false`.
+
 ## [0.4.0] - 2026-05-12
 
 Minor bump — adds a meaningful new API surface plus closes several Tier-C SEO audit items the engine couldn't address before. View Transitions now span every page type, hero/card images opt into responsive `<picture>` markup, posts gain Speakable + HowTo Schema.org opt-ins, the engine emits skip-to-content links and surfaces per-site preconnect / DNS-prefetch hints, and the integration's inline-stylesheets default ships as `auto`.

@@ -13,6 +13,7 @@ import {
   buildPostMeta,
   breadcrumbSchema,
   organizationSchema,
+  websiteSchema,
   collectionPageSchema,
   type MetaTags,
 } from "../seo/index.js"
@@ -165,7 +166,15 @@ export function prepareIndexPage(input: {
         : undefined,
     }),
     jsonLd: [
-      organizationSchema(siteConfig),
+      // Site-level schemas emitted only when the host site isn't already
+      // doing so (siteConfig.seo.emitOrganizationSchema=false on Keel-hosted
+      // sites; emitWebsiteSchema=true for standalone deployments).
+      ...(siteConfig.seo.emitOrganizationSchema !== false
+        ? [organizationSchema(siteConfig)]
+        : []),
+      ...(siteConfig.seo.emitWebsiteSchema === true
+        ? [websiteSchema(siteConfig)]
+        : []),
       collectionPageSchema({
         name: `${siteConfig.siteName} — ${title}`,
         description,

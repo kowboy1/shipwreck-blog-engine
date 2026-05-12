@@ -84,6 +84,33 @@ export const postSchema = z.object({
     })
     .optional(),
 
+  // -------- GEO (Generative Engine Optimization) fields --------
+  // Optional Schema.org Article enrichments that signal to LLM answer
+  // engines (ChatGPT search, Perplexity, Claude search, Google AI
+  // Overviews, Bing Copilot) when this post is appropriate to quote /
+  // cite. Empty values are omitted from the generated JSON-LD.
+
+  /** One-sentence, self-contained summary distinct from metaDescription
+   *  (which is for SERPs). AI answer engines often quote `abstract`
+   *  verbatim — write it to be quotable on its own. Emitted as
+   *  Schema.org Article.abstract. */
+  abstract: z.string().max(320).optional(),
+  /** Entities this post is ABOUT (primary subjects). Used by LLMs to
+   *  disambiguate topical relevance. Emit as Schema.org Article.about[]. */
+  about: z.array(z.string()).optional(),
+  /** Entities this post MENTIONS but isn't primarily about (secondary
+   *  references). Helps entity linking. Emit as Schema.org Article.mentions[]. */
+  mentions: z.array(z.string()).optional(),
+  /** Copyright holder. Defaults to site organization. Set to override per-post
+   *  (e.g. syndicated content from another publisher). */
+  copyrightHolder: z.string().optional(),
+  /** License URL (Creative Commons, custom). Emitted as Schema.org Article.license.
+   *  Increasingly important for AI training-data opt-in/opt-out signaling. */
+  license: z.string().url().optional(),
+  /** Explicit AI-crawler signal. Default true (content is freely accessible).
+   *  Set false for paywalled / member-only posts. Emit as Article.isAccessibleForFree. */
+  isAccessibleForFree: z.boolean().default(true),
+
   metaTitle: z.string().max(70).optional(),
   metaDescription: z.string().max(170).optional(),
   canonical: z.string().url().optional(),

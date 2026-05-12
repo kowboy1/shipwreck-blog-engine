@@ -385,6 +385,47 @@ else
   fail "Post page MISSING ClientRouter — view transitions only on listings"
 fi
 
+# v0.4.1: GEO Schema.org fields on Article (abstract, about, mentions,
+# copyrightHolder, isAccessibleForFree, license).
+if grep -q '"abstract":' "$POST_HTML"; then
+  ok "Article JSON-LD includes abstract (GEO quotable summary)"
+else
+  fail "Article JSON-LD MISSING abstract"
+fi
+if grep -q '"about":\[{"@type":"Thing"' "$POST_HTML"; then
+  ok "Article JSON-LD includes about[] Thing entities"
+else
+  fail "Article JSON-LD MISSING about[] entities"
+fi
+if grep -q '"mentions":\[{"@type":"Thing"' "$POST_HTML"; then
+  ok "Article JSON-LD includes mentions[] Thing entities"
+else
+  fail "Article JSON-LD MISSING mentions[] entities"
+fi
+if grep -q '"copyrightHolder":' "$POST_HTML"; then
+  ok "Article JSON-LD includes copyrightHolder"
+else
+  fail "Article JSON-LD MISSING copyrightHolder"
+fi
+if grep -q '"isAccessibleForFree":true' "$POST_HTML"; then
+  ok "Article JSON-LD includes isAccessibleForFree=true default"
+else
+  fail "Article JSON-LD MISSING isAccessibleForFree"
+fi
+if grep -q '"license":' "$POST_HTML"; then
+  ok "Article JSON-LD includes license URL"
+else
+  fail "Article JSON-LD MISSING license"
+fi
+
+# v0.4.1: site-level schema opt-out flags work — default behaviour emits
+# Organization on listings; engine-only flag emits WebSite when set.
+if grep -q '"@type":"Organization"' "$INDEX_HTML"; then
+  ok "Default emitOrganizationSchema=true: Organization on /blog/ index"
+else
+  fail "Organization schema missing from /blog/ index"
+fi
+
 # v0.4.0: skip-to-content link emitted from engine pages
 if grep -q 'href="#shipwreck-main"' "$POST_HTML"; then
   ok "Post page renders skip-to-content link (accessibility)"

@@ -31,6 +31,24 @@ export const siteConfigSchema = z.object({
      *  resolves DNS, doesn't open the TCP+TLS connection). Use for low-
      *  priority third-party origins. */
     dnsPrefetches: z.array(z.string().url()).optional(),
+
+    /**
+     * Site-level schema emission opt-outs. Used when the host site is
+     * already emitting these globally (e.g. a Keel-hosted site already
+     * emits Organization sitewide — engine should NOT duplicate on its
+     * listing pages or Google may parse conflicting entities).
+     *
+     * When `false`, engine omits the corresponding Schema.org block from
+     * blog pages. Page-specific schemas (Article, CollectionPage, FAQ,
+     * Breadcrumb, Speakable, HowTo) are unaffected — those stay engine-
+     * owned regardless of these flags.
+     */
+    emitOrganizationSchema: z.boolean().default(true),
+    /** When true (default false), the engine ALSO emits a WebSite schema
+     *  on listing pages. Most hosts (Keel) emit this sitewide; the engine
+     *  defaults to off to avoid duplicates. Turn on for standalone blog
+     *  deployments where the engine is the only schema producer. */
+    emitWebsiteSchema: z.boolean().default(false),
   }),
 
   layout: z

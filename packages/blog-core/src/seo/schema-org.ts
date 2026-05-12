@@ -77,11 +77,20 @@ export function articleSchema(args: {
       }
     : undefined
 
+  // GEO (Generative Engine Optimization) enrichments — Article.about /
+  // mentions emitted as bare Thing nodes (Schema.org accepts this lightweight
+  // form when name is the only known property). LLMs use these for entity
+  // disambiguation when deciding whether to cite this article.
+  const aboutEntities = (post.about ?? []).map((name) => ({ "@type": "Thing", name }))
+  const mentionsEntities = (post.mentions ?? []).map((name) => ({ "@type": "Thing", name }))
+  const copyrightHolder = post.copyrightHolder ?? siteConfig.brand.organizationName
+
   return {
     "@context": "https://schema.org",
     "@type": post.articleType ?? "BlogPosting",
     headline: post.metaTitle ?? post.title,
     description: post.metaDescription ?? post.excerpt,
+    ...(post.abstract ? { abstract: post.abstract } : {}),
     ...(image ? { image } : {}),
     /** dateCreated == datePublished for our model (we don't track creation
      *  separately from first publish). Still useful as a Schema.org signal. */
@@ -90,12 +99,17 @@ export function articleSchema(args: {
     dateModified: (post.updatedDate ?? post.publishDate).toISOString(),
     inLanguage: siteConfig.seo.locale,
     ...(typeof wordCount === "number" && wordCount > 0 ? { wordCount } : {}),
+    ...(aboutEntities.length > 0 ? { about: aboutEntities } : {}),
+    ...(mentionsEntities.length > 0 ? { mentions: mentionsEntities } : {}),
     author: authorJsonLd,
     publisher: {
       "@type": "Organization",
       name: siteConfig.brand.organizationName,
       ...(publisherLogo ? { logo: publisherLogo } : {}),
     },
+    copyrightHolder: { "@type": "Organization", name: copyrightHolder },
+    ...(post.license ? { license: post.license } : {}),
+    isAccessibleForFree: post.isAccessibleForFree !== false,
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
   }
 }
@@ -107,6 +121,27 @@ export function organizationSchema(siteConfig: SiteConfig) {
     name: siteConfig.brand.organizationName,
     url: siteConfig.baseUrl,
     ...(siteConfig.brand.logoUrl ? { logo: siteConfig.brand.logoUrl } : {}),
+  }
+}
+
+/**
+ * Site-level WebSite JSON-LD. Most host sites (Keel, etc.) already emit
+ * this globally — the engine defaults to NOT emitting (avoids duplicate
+ * entities). Standalone blog deployments where the engine is the only
+ * schema producer should set `siteConfig.seo.emitWebsiteSchema: true`.
+ */
+export function websiteSchema(siteConfig: SiteConfig) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: siteConfig.siteName,
+    url: siteConfig.baseUrl,
+    inLanguage: siteConfig.seo.locale,
+    publisher: {
+      "@type": "Organization",
+      name: siteConfig.brand.organizationName,
+      ...(siteConfig.brand.logoUrl ? { logo: siteConfig.brand.logoUrl } : {}),
+    },
   }
 }
 
