@@ -5,6 +5,13 @@ export interface MetaTags {
   description?: string
   canonical: string
   robots: string
+  /**
+   * Additional `<link>` tags to emit in <head>. Used for rel="prev"/rel="next"
+   * on paginated listings (Bing/Yandex still use these signals — Google
+   * deprecated them in 2019 but emitting them is cheap and harmless).
+   * Consumer BaseLayout should render: meta.links?.map((l) => <link rel={l.rel} href={l.href} />)
+   */
+  links?: Array<{ rel: string; href: string }>
   og: {
     title: string
     description?: string

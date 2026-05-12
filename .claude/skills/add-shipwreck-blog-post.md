@@ -279,21 +279,117 @@ Edit the existing post's MDX to add the link. Commit as a separate commit (`docs
 
 ---
 
-## Phase 7 — Images, alt text, OG
+## Phase 7 — Hero image (MANDATORY — every published post needs one)
 
-If the post has a featured image:
+As of engine v0.3.11, **every published post must have a `featuredImage`.** This is not optional. The doctor's default closeout gate fails fatal on any published post lacking one. Reasons it's mandatory:
 
-- **Save it under `_blog/public/blog/images/<slug>-hero.<ext>`** (or wherever the site convention is)
-- **1200×630 PNG or JPG** — this dimension serves both the in-page hero AND the social/OG image
-- **`featuredImageAlt`** is required in frontmatter — describe the image meaningfully, don't just repeat the title
-- **Optimize file size.** Run through TinyPNG or similar. <200KB ideal, <500KB max.
+- **SEO**: the featured image is the OG card on every social share (LinkedIn, X, Slack, Facebook) and the image used by Google Discover and image-search indexing
+- **Listing UX**: every card on `/blog/` (and tag/category/author archives) is 16:9 with the hero at the top — text-only cards look broken in a grid
+- **Brand recognition**: consistent visual identity across posts is what makes a blog feel like a destination rather than a content dump
 
-If the post has body images:
+**File spec:**
+- **1200×630 PNG/JPG**, or 16:9 SVG (`.svg`) for vector heroes — serves both in-page hero AND OG card
+- **Optimize file size** — <200KB ideal, <500KB max. Run through TinyPNG / Squoosh if raster.
+- **Save under `_blog/public/uploads/<slug>-hero.<ext>`** (or whatever the site's `cards.fallbackImage` directory convention is)
+- **`featuredImageAlt` REQUIRED in frontmatter** — describe the image meaningfully (do NOT just repeat the title)
 
-- Save under `_blog/public/blog/images/<slug>-<descriptor>.<ext>`
-- Reference in MDX with markdown image syntax: `![alt text](/blog/images/<slug>-<descriptor>.jpg)`
+**Where does the image come from?** Three sources, in priority order:
+1. **User-provided** — the user handed you an image to use. Just save it + reference it. Done.
+2. **Existing brand asset library** — check `_blog/public/uploads/` for an image that genuinely fits the post topic. Don't force a bad match.
+3. **Generated** — use the hero-image generation flow in Phase 7.5 below. This is the default when no human-provided image exists.
+
+If the post has body images, those follow the same rules (alt text required, optimized, in `/uploads/`).
+
+---
+
+## Phase 7.5 — Hero image generation (NyXi GPT-image flow)
+
+**When**: no user-provided image, no matching asset in the brand library. The agent generates the hero.
+
+**Precondition checks (run first):**
+
+```bash
+cd <site-repo>
+# 1. Confirm doctor heroes shows this post is missing:
+npx shipwreck-blog-doctor heroes
+# 2. Read art direction if it exists:
+cat .shipwreck/art-direction.json 2>/dev/null
+```
+
+### 7.5a — First post on this site (no art direction yet)
+
+If `.shipwreck/art-direction.json` doesn't exist, you must establish art direction BEFORE generating. The agent prompts the user — exact text:
+
+> "I need to generate a hero image for this post, but this site doesn't have art direction set yet. How should hero images look for `<site-name>`?
+>
+> Options:
+> 1. Type a description (e.g. 'coastal photography, ocean tones, no text overlay').
+> 2. Type **auto** — I'll screenshot the homepage and derive a style from your site's existing visual identity.
+> 3. Type **skip** — silence the hero requirement for now (sets `heroes.policy: optional` in site.config.ts; come back to this later)."
+
+**On 'auto':** screenshot the live homepage (`https://<domain>/`), describe its visual identity (palette, photographic-vs-illustrated, mood, subject matter, whether text/logos appear). Compress that into a `style` string, sample 3-5 colors into `palette`. Set `source: "derived-from-homepage"`.
+
+**On user description:** parse into the schema. Set `source: "user-provided"`.
+
+Write the file at **`<site-repo>/.shipwreck/art-direction.json`** following the engine's `artDirectionSchema` (export from `@shipwreck/blog-core`). Required fields: `style`, `aspectRatio` (default "16:9"), `createdAt` (ISO timestamp), `source`. Optional: `palette`, `subjectHint`, `avoid`, `notes`.
+
+Example:
+
+```json
+{
+  "style": "documentary coastal photography, low-saturation, no text overlay, no people's faces",
+  "palette": ["#1e3a5f", "#7ba9c4", "#f5e6c8"],
+  "aspectRatio": "16:9",
+  "subjectHint": "Wollongong / Illawarra coast, escarpment, sky",
+  "avoid": ["stock photo watermarks", "text overlays", "AI hand artifacts"],
+  "notes": "Should feel local and grounded, not generic.",
+  "createdAt": "2026-05-12T12:00:00Z",
+  "source": "user-provided"
+}
+```
+
+Commit this file as a separate commit (`chore(blog): set art direction for hero generation`).
+
+### 7.5b — Generate the hero
+
+Once art direction is set:
+
+1. **Build the prompt.** Combine:
+   - `style` from art-direction.json
+   - `subjectHint` from art-direction.json
+   - `avoid` from art-direction.json (negative prompt or "do not include …" clause)
+   - Post-specific: `title` + `excerpt` from the new post's frontmatter
+   - Format hint: "16:9 aspect ratio, 1200×630 minimum, no text or watermarks"
+2. **Generate via your image-gen tool.** NyXi: use the GPT image generation through your OAuthed business account. Other agents: substitute equivalent.
+3. **Save** to `<site-repo>/_blog/public/uploads/<slug>-hero.<ext>` (PNG for photographic, SVG only if explicitly vector style).
+4. **Optimize** if raster — TinyPNG or Squoosh, target <200KB.
+5. **Update frontmatter** with:
+   ```yaml
+   featuredImage: "/uploads/<slug>-hero.<ext>"
+   featuredImageAlt: "<descriptive 8-15 word alt text — describe what's IN the image, not the post topic>"
+   ```
+6. **Verify**: `npx shipwreck-blog-doctor heroes` should no longer list this slug.
+
+### 7.5c — Anti-patterns
+
+| Anti-pattern | Why it's bad |
+|---|---|
+| Reusing the same hero across multiple posts on one site | Loses per-post uniqueness on social cards; image search shows duplicates |
+| Generating without consulting art-direction.json | Visual identity drifts post-by-post; site loses coherence |
+| Setting `featuredImageAlt` to the post title | Wasted accessibility + SEO opportunity; alt should describe the image |
+| Using the site's OG default banner as a per-post hero | That banner is for the brand, not the article — Google detects and devalues |
+| Generating images with embedded text | Image-only text doesn't help SEO and looks dated; let real headings carry the words |
+| Setting `heroes.policy: optional` "just to ship" | The policy is required for a reason — set optional only as a deliberate, time-bound exception |
+
+### 7.5d — Body images (same rules)
+
+If the post has additional images in the body:
+
+- Save under `_blog/public/uploads/<slug>-<descriptor>.<ext>`
+- Reference in MDX: `![alt text](/uploads/<slug>-<descriptor>.jpg)`
 - **Every body image needs alt text.** Empty alt for purely decorative images (`![](...)`) — never just omit the brackets.
 - Optimize file size
+- Body images don't need to come from the same art direction as the hero — but they should at least feel consistent with it
 
 ---
 
@@ -398,7 +494,8 @@ The post is "done" when ALL of the following are true:
 - [ ] FAQ items added if natural for the topic (Phase 5)
 - [ ] 2-5 outbound internal links present (Phase 6a)
 - [ ] At least 1 reciprocal link added from a relevant existing post (Phase 6c) — separate commit
-- [ ] Featured image saved + optimized + alt text set (Phase 7) — if image is appropriate
+- [ ] Featured image saved + optimized + descriptive alt text set (Phase 7) — **MANDATORY** for every published post (engine v0.3.11+). Generated via Phase 7.5 if no user-provided image exists.
+- [ ] `.shipwreck/art-direction.json` exists for the site (created in Phase 7.5a on first post if not already present)
 - [ ] `npm run build` passes (Phase 8)
 - [ ] Local preview shows the post correctly (Phase 8)
 - [ ] Committed + pushed to per-site repo (Phase 9)
