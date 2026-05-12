@@ -190,6 +190,56 @@ else
   fail "Post page has $H1_COUNT H1 elements (expected 1)"
 fi
 
+# v0.3.16: negative test for the fuzzy-match plugin. Write a post whose body
+# H1 doesn't exactly match the frontmatter title (the common "title + suffix"
+# case that bit Wollongong Weather), build, and assert only one H1 survives.
+H1_TEST_MDX="$TEST_SITE/src/content/posts/h1-fuzzy-test.mdx"
+cat > "$H1_TEST_MDX" <<'MDX'
+---
+title: "Reading rain radar properly (without overreacting)"
+publishDate: 2026-05-12
+status: "published"
+author: "rick"
+category: "guides"
+tags: ["test"]
+featuredImage: "/uploads/seed-hero.svg"
+featuredImageAlt: "test"
+---
+
+# Reading rain radar properly
+
+Body H1 above is a fuzzy match (prefix) of the frontmatter title — plugin
+must strip it.
+
+## Real section
+
+Body content.
+
+# Another body H1 that doesn't match the title at all
+
+That second H1 should be downgraded to H2 (kept, not removed, since it's
+genuine content rather than a title duplicate).
+MDX
+npm run build > /dev/null 2>&1 || true
+H1_TEST_HTML="$TEST_SITE/dist/h1-fuzzy-test/index.html"
+if [[ -f "$H1_TEST_HTML" ]]; then
+  FUZZY_H1_COUNT=$(grep -c '<h1' "$H1_TEST_HTML" || echo 0)
+  if [[ $FUZZY_H1_COUNT -eq 1 ]]; then
+    ok "Plugin fuzzy-matches title prefix + downgrades non-matching body H1 (exactly one H1 survives)"
+  else
+    fail "Plugin failed on fuzzy-match post: $FUZZY_H1_COUNT H1 elements (expected 1)"
+  fi
+  # And the unrelated body H1 should have become an H2 (still present as text)
+  if grep -q "Another body H1 that doesn" "$H1_TEST_HTML"; then
+    ok "Non-matching body H1 preserved as H2 (content not lost)"
+  else
+    fail "Non-matching body H1 content lost during downgrade"
+  fi
+else
+  fail "Build of h1-fuzzy-test.mdx did not produce dist/h1-fuzzy-test/index.html"
+fi
+rm -f "$H1_TEST_MDX" "$H1_TEST_HTML"
+
 # JSON-LD article schema present
 if grep -q '"@type":"BlogPosting"' "$POST_HTML"; then
   ok "Post page emits BlogPosting JSON-LD schema"

@@ -138,11 +138,15 @@ The slug is the filename minus `.mdx`. It becomes part of the URL: `https://<dom
 
 ## Phase 3 — Heading hierarchy (one H1, no skips)
 
-The engine renders the frontmatter `title` as the page's H1. The `remarkStripDuplicateH1` plugin (v0.3.0+) automatically removes a leading H1 from the MDX body if it duplicates the title — so you can safely write `# Title` at the top, but you don't need to.
+The engine renders the frontmatter `title` as the page's H1. The `remarkStripDuplicateH1` plugin (v0.3.16+) **defends against body H1s in three ways**:
 
-**Rules for body headings:**
+- **Title-duplicate** (fuzzy match against frontmatter title, including prefix / token-overlap) → **stripped entirely**. So if someone pastes the article title at the top of the MDX (or pastes a near-version of it — e.g. without the parenthetical subtitle), the engine just removes it. This is the most common failure mode and the plugin handles it silently.
+- **Unrelated body H1** (real content, not a title duplicate) → **downgraded to H2 in place**. Heading hierarchy stays sane; content isn't lost.
+- **Build-time warning** emitted for either transformation so authors see in the build log when the engine has corrected their MDX.
 
-- **Body uses `##` (H2) for top-level sections.** Never `#` (H1) in the body.
+**Even with that defense, write the MDX correctly the first time**:
+
+- **Body uses `##` (H2) for top-level sections.** Never `#` (H1) in the body. The engine WILL handle it if you slip up, but treating the plugin as a fallback rather than a substitute keeps your MDX portable + readable.
 - **`###` (H3) for subsections under an H2.** Never skip levels — don't go H2 → H4.
 - **`####` (H4) sparingly** — usually a sign you're over-structuring; consider whether that subsection should just be a paragraph.
 - **No empty headings**, no headings used purely for styling.
@@ -150,6 +154,8 @@ The engine renders the frontmatter `title` as the page's H1. The `remarkStripDup
 - **Don't write headings as questions unless they ARE questions** — H2s like "Should I be worried about flooding?" are fine; don't fake it.
 
 The engine builds a Table of Contents from H2s and H3s. Good heading discipline = good ToC = good UX.
+
+**Safety net**: `shipwreck-blog-doctor` walks the built `dist/` post pages and **fails fatal if any built post page has more than one `<h1>`**. If the plugin somehow doesn't run (e.g. someone removed `@shipwreck/blog-core/integration` from `astro.config.ts`), this catches the regression before completion.
 
 ---
 

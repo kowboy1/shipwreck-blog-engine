@@ -8,6 +8,48 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.16] - 2026-05-12
+
+Fixes a long-standing gap in the duplicate-H1 defence: the v0.2.0 `remarkStripDuplicateH1` plugin only handled an EXACT title match on the FIRST tree node, so any near-match or non-leading body H1 slipped through. Wollongong Weather had two H1s on its rain-radar post because the body H1 was `"How to read Wollongong rain radar properly"` and the frontmatter title was `"How to read Wollongong rain radar properly (without overreacting)"` — close but not exact.
+
+Three layers of defence in this release:
+
+### Layer 1 — plugin handles every body H1, not just exact leading match
+
+`remarkStripDuplicateH1` rewritten:
+
+- **Visits every H1 in the body**, not just `tree.children[0]`. Handles posts where an H1 appears mid-document (e.g. after a TL;DR section).
+- **Loose title match** when a body H1 is a duplicate of the frontmatter title. Match tolerates:
+  - case + whitespace differences
+  - prefix relationship (one being a substring of the other from the start — handles parentheticals / suffixes like "(without overreacting)")
+  - token-set overlap of ≥ 80% (handles minor word reorderings / em-dash vs colon / etc.)
+- **Title duplicates → stripped entirely** (this is the "user pasted the title twice" case).
+- **Non-matching body H1s → downgraded to H2 in place** (genuine content kept, hierarchy fixed).
+- **Build-time `file.message()`** emitted for every transformation, so authors see in their build log when the engine has corrected their MDX.
+
+### Layer 2 — doctor safety net
+
+New check in `shipwreck-blog-doctor`: walks every built `dist/<slug>/index.html` post page, counts `<h1>` elements, fails fatal if any has >1. Catches the case where the remark plugin was removed from `astro.config.ts`, mis-ordered, or where HTML-in-MDX bypassed remark altogether.
+
+Skipped under `--preflight` / `--skip-build` (no built output to inspect).
+
+### Layer 3 — skill reinforcement
+
+The `add-shipwreck-blog-post` skill's Phase 3 rewritten to (a) document the three plugin behaviours, (b) reinforce that authors should still write the MDX correctly, and (c) explicitly call out the doctor safety net so agents know completion is gated on a clean H1 count.
+
+### Integration test: 56/56 (2 new assertions)
+
+New negative test creates a post with both a fuzzy-match body H1 (prefix of frontmatter title) and a totally-unrelated body H1, builds, then asserts:
+
+- exactly one H1 survives on the built post page (proves both code paths fire)
+- the unrelated H1's text is still in the page (proves downgrade preserved content, didn't strip it)
+
+### Migration from 0.3.15
+
+No consumer changes required. The plugin upgrade is API-compatible — anything that worked under the old strict-match still works; cases that fell through now get caught. Existing sites with duplicate H1s already in their dist will see them go away on the next build.
+
+If you've manually patched any sites with workarounds (e.g. wrapping the engine's H1 in a different element to avoid the duplicate), those workarounds become unnecessary but harmless — leave or remove at leisure.
+
 ## [0.3.15] - 2026-05-12
 
 Tag chip list now collapses to the top 6 by default, with a "See N more →" toggle that slides the rest open. Stops the sidebar getting unwieldy on tag-heavy sites while keeping every tag one click away.

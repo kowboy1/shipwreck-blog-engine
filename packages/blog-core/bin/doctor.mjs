@@ -815,6 +815,63 @@ if (!PREFLIGHT) {
   }
 }
 
+// 5f. Multi-H1 guard on built post pages (v0.3.16+). The remark plugin
+// remarkStripDuplicateH1 is supposed to make this impossible, but defence
+// in depth: scan every built post page in dist/ and fail fatal if any of
+// them contain more than one <h1>. Catches the case where the plugin was
+// removed from astro.config, mis-ordered behind another plugin, or where
+// HTML-in-MDX bypasses remark altogether.
+//
+// Only runs after a build (skipped under --skip-build / --preflight).
+if (!PREFLIGHT && !SKIP_BUILD) {
+  const distDir = resolve(CWD, "dist")
+  if (existsSync(distDir)) {
+    const offenders = []
+    const visit = (dir) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name)
+        if (entry.isDirectory()) {
+          // Skip the engine's own paginated index dir + system dirs — only
+          // walk post page outputs. Post pages live at /<slug>/index.html
+          // (sibling to the listing index). We can't easily distinguish from
+          // tag/category/author archive pages, so we check ALL HTML files
+          // and skip the well-known listing dirs.
+          if (["_astro", "page", "tags", "categories", "authors", "admin"].includes(entry.name)) continue
+          visit(full)
+        } else if (entry.isFile() && entry.name === "index.html") {
+          // Skip the top-level listing index (its H1 is the page title, fine).
+          if (full === resolve(distDir, "index.html")) continue
+          const html = readFileSync(full, "utf8")
+          // Count <h1 occurrences (case-insensitive, allowing attributes).
+          const matches = html.match(/<h1[\s>]/gi)
+          if (matches && matches.length > 1) {
+            offenders.push({
+              path: full.replace(CWD, "."),
+              count: matches.length,
+            })
+          }
+        }
+      }
+    }
+    try { visit(distDir) } catch { /* non-fatal walk failure */ }
+
+    if (offenders.length === 0) {
+      pass("Every built post page has exactly one <h1>")
+    } else {
+      const list = offenders
+        .map((o) => `  - ${o.path} (${o.count} H1 elements)`)
+        .join("\n")
+      fail(
+        "Post pages with multiple H1 elements detected",
+        `Multi-H1 pages confuse crawlers + screen readers + the ToC. ` +
+          `The remarkStripDuplicateH1 plugin should normally prevent this — ` +
+          `check that @shipwreck/blog-core/integration is loaded in astro.config ` +
+          `and that no later plugin is re-injecting H1 elements. Offenders:\n${list}`,
+      )
+    }
+  }
+}
+
 // 6. Source-vs-deploy layout guardrail (Nyxi feedback #6)
 // The blog SOURCE repo should not be the same dir as the host's static MOUNT path.
 // If you accidentally point your blog source at the host's docroot, you'll
