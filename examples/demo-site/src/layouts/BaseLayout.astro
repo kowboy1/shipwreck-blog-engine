@@ -21,6 +21,7 @@ const ldArray = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []
     <title>{meta.title}</title>
     {meta.description && <meta name="description" content={meta.description} />}
     <link rel="canonical" href={meta.canonical} />
+    {meta.links?.map((l) => <link rel={l.rel} href={l.href} />)}
     <meta name="robots" content={meta.robots} />
 
     <meta property="og:type" content={meta.og.type} />

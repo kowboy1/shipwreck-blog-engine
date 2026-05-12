@@ -8,6 +8,155 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.11] - 2026-05-12
+
+Hero images are now **mandatory** for every published post. Doctor enforces it, the `add-shipwreck-blog-post` skill walks the agent through a generation flow (NyXi-side: GPT-via-OAuthed-business-account), and a new per-site `.shipwreck/art-direction.json` file keeps generated imagery coherent across posts. SEO-first: every post now ships with a unique OG card and a 16:9 image-search-discoverable asset.
+
+### Added: `siteConfig.heroes.policy`
+
+```ts
+heroes: {
+  policy: "required" | "optional"   // default "required"
+}
+```
+
+`"required"` (default) — doctor fails fatal on any published post lacking `featuredImage`. `"optional"` — doctor warns but doesn't block; for legacy/migration windows only.
+
+### Added: doctor enforcement
+
+The default closeout gate (and `--lite` mode) now scan `src/content/posts/*.mdx`, parse frontmatter, and check every `status: "published"` post for `featuredImage`. Behaviour mirrors the heroes.policy setting. The error message points the agent at the new hero-generation flow.
+
+### Added: `shipwreck-blog-doctor heroes` subcommand
+
+```bash
+npx shipwreck-blog-doctor heroes           # human-readable
+npx shipwreck-blog-doctor heroes --json    # machine-readable
+```
+
+Lists every published post missing `featuredImage` (slug + title + excerpt + path) AND dumps the current `.shipwreck/art-direction.json` if present. Designed for an agent to call before generating heroes — one call yields both the post list and the art-direction prompt seed.
+
+### Added: art-direction contract (`packages/blog-core/src/schemas/art-direction.ts`)
+
+New Zod schema `artDirectionSchema` for `.shipwreck/art-direction.json` — version-controlled per site, sibling to `.shipwreck-site.json`:
+
+```ts
+{
+  style: string                        // "documentary coastal photography, low-saturation..."
+  palette?: string[]                   // ["#1e3a5f", "#7ba9c4", ...]
+  aspectRatio: "16:9" | "4:3" | ...    // default "16:9"
+  subjectHint?: string                 // "Wollongong coast, escarpment, sky"
+  avoid?: string[]                     // ["text overlays", "stock watermarks", ...]
+  notes?: string
+  createdAt: string                    // ISO-8601
+  source: "user-provided" | "derived-from-homepage" | "manual-edit"
+}
+```
+
+Exported from `@shipwreck/blog-core` via `schemas/index.ts`. Agents writing this file should validate against the schema.
+
+### Added: `add-shipwreck-blog-post` skill — Phase 7 mandatory + Phase 7.5 generation flow
+
+The skill's Phase 7 rewritten to state hero images are MANDATORY, with the explicit reasons (OG card, listing UX, brand recognition). New Phase 7.5 walks the agent through:
+
+- **7.5a (first post on site)** — when `.shipwreck/art-direction.json` doesn't exist: prompt user with exact text covering three options (type description / `auto` to derive from homepage screenshot / `skip` to set policy=optional). On `auto`, agent screenshots `https://<domain>/`, derives style + palette, writes art-direction.json with `source: "derived-from-homepage"`. Committed as a separate commit.
+- **7.5b (generation)** — combines art-direction + per-post title/excerpt + format hints into the image-gen prompt. NyXi runs through her OAuthed GPT business account; other agents substitute equivalent. Saves to `_blog/public/uploads/<slug>-hero.<ext>`, updates frontmatter with `featuredImage` + descriptive `featuredImageAlt`.
+- **7.5c** — anti-patterns (reusing heroes across posts, using OG default as per-post hero, setting alt to title, embedded text, hero "skip" as a habit).
+- **7.5d** — body images same rules.
+
+### Added: seed-posts ship with a working hero
+
+`packages/blog-core/src/templates/seed-posts/seed-hero.svg` — generic blue-gradient 16:9 placeholder SVG bundled with the engine. `seed-posts` subcommand now copies it to `public/uploads/seed-hero.svg` and the three seed-post templates reference it as `featuredImage`. Result: `seed-posts` produces a doctor-green install — no immediate "you have no heroes" failure on a brand-new integration.
+
+Demo-site posts (`hello-world.mdx`, `seo-checklist.mdx`, `why-not-wordpress.mdx`) likewise carry the same SVG so the integration acceptance test stays green out of the box.
+
+### Integration test: 46/46 (3 new assertions)
+
+- Doctor confirms heroes-check passes when every published post has featuredImage
+- Doctor flags missing-hero posts when one is removed
+- `heroes --json` subcommand emits machine-readable output including the missing slug
+
+### Migration from 0.3.10
+
+For existing sites (sites with posts predating this release, like Wollongong Weather's three current posts):
+
+```bash
+cd <site-repo>/_blog
+npx shipwreck-blog-doctor heroes              # lists what's missing
+npm update @shipwreck/blog-core               # pick up the heroes check
+npx shipwreck-blog-doctor heroes              # confirm; will list every imageless post
+```
+
+Then for each listed post, run the `add-shipwreck-blog-post` Phase 7.5 flow to generate a hero (or set `heroes.policy: "optional"` in `site.config.ts` for a deliberate, time-bound exception during migration).
+
+After heroes are added, `npx shipwreck-blog-doctor --lite --skip-build` should pass cleanly.
+
+## [0.3.10] - 2026-05-12
+
+Index/archive listing pages now render as a responsive 3-column card grid with a mandatory 16:9 featured image at the top of every card, plus smooth in-app navigation between paginated pages and a "Load more" button that appends the next page's cards without a full reload.
+
+### Changed: ListingPage renders a 3-col card grid
+
+`@shipwreck/blog-core/pages/ListingPage.astro` now renders posts as `grid gap-6 sm:grid-cols-2 lg:grid-cols-3` instead of a vertical list of `variant="list"` cards. The container widened from `max-w-3xl` to `max-w-7xl` to give the grid room. Affects the blog index, paginated index (`/blog/page/N/`), tag, category, and author archive pages.
+
+### Changed: PostCard `variant="card"` always renders a 16:9 image area
+
+`PostCard` in `card` mode now always reserves a 16:9 image slot at the top of the card — uses `post.data.featuredImage` if set, otherwise `siteConfig.cards.fallbackImage`, otherwise an empty placeholder surface (`bg-bg/40`). Card body uses `flex flex-col` so the date footer pins to the bottom regardless of excerpt length. `variant="list"` behaviour unchanged (text-only when no featured image — preserves 0.2.0 fix).
+
+### Added: `siteConfig.cards.fallbackImage`
+
+New optional field on `siteConfigSchema`:
+
+```ts
+cards: {
+  fallbackImage?: string    // URL of fallback image for cards lacking featuredImage
+  loadMore?: boolean        // default true — render the "Load more" button on paginated listings
+}
+```
+
+When a post has no `featuredImage`, the card uses `cards.fallbackImage` (rendered as decorative — `aria-hidden`, empty `alt`). Distinct from `seo.defaultFeaturedImage` / `seo.defaultOgImage` by design — the 0.2.0 changelog flagged using the OG/brand banner as in-page imagery as the wrong default. Sites that don't set a fallback get an empty placeholder surface (still maintains card grid geometry).
+
+### Added: `<ClientRouter />` shipped from engine pages
+
+ListingPage and (via the same flow) paginated listings now include Astro's `<ClientRouter />` from `astro:transitions`. Cross-page navigation (page 1 → page 2, tag → tag, post → post) does a soft DOM swap instead of a full browser reload. No consumer BaseLayout changes required — the engine page renderer is the canonical mount point.
+
+### Added: "Load more" button on paginated listings
+
+When `pagination.current < pagination.total` and `siteConfig.cards.loadMore !== false`, a "Load more" button renders below the grid. Click fetches the next paginated static page (e.g. `/blog/page/2/`), parses it, extracts the card grid children, and appends them into the current page's grid. Increments the dataset cursor and updates the button to point at the next page, or removes the button when the last page is appended. The original `<Pagination>` component still renders below the button — paginated URLs stay crawlable and shareable (SEO preserved).
+
+Re-binds on `astro:page-load` so view-transition navigations re-initialise the handler.
+
+### Added: `<link rel="prev">` / `<link rel="next">` on paginated listings
+
+`MetaTags` gained an optional `links: Array<{ rel: string; href: string }>` field. `prepareIndexPage` populates it with absolute-URL `rel="prev"` / `rel="next"` entries whenever the listing is paginated. Google deprecated this signal in 2019 but Bing/Yandex still use it — cheap to emit, can't hurt.
+
+Renders in `<head>` (consumer BaseLayout responsibility — pattern matches the existing `meta.canonical` line):
+
+```astro
+{meta.links?.map((l) => <link rel={l.rel} href={l.href} />)}
+```
+
+`page/1` correctly emits `rel="prev"` pointing at `/blog/` (not `/blog/page/0/`). The last page emits no `rel="next"`.
+
+### Migration from 0.3.9
+
+Consumer sites:
+1. `npm update @shipwreck/blog-core @shipwreck/blog-theme-default`
+2. Add the `meta.links` render line to `src/layouts/BaseLayout.astro` (next to the existing `<link rel="canonical" ... />` line):
+   ```astro
+   <link rel="canonical" href={meta.canonical} />
+   {meta.links?.map((l) => <link rel={l.rel} href={l.href} />)}
+   ```
+3. Optionally add to `site.config.ts`:
+   ```ts
+   cards: {
+     fallbackImage: "/path/to/fallback.jpg",   // recommended
+     loadMore: true,                            // default — set to false to disable
+   }
+   ```
+4. `rm -rf _blog/dist _blog/.astro && npm run build`
+
+No required changes for grid/card behaviour — sites without `cards.fallbackImage` get an empty placeholder slot. Sites without `cards` at all behave identically (loadMore defaults to true). The `meta.links` render is additive; sites that don't add it just don't emit `rel="prev"`/`rel="next"` (no error).
+
 ## [0.3.9] - 2026-04-29
 
 Closes four bugs surfaced by Nyxi's first-procedurally-clean integration:

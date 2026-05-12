@@ -59,14 +59,32 @@ function buildListingMeta(input: {
   description: string
   url: string
   siteConfig: SiteConfig
+  pagination?: { current: number; total: number; baseUrl: string }
 }): MetaTags {
   const meta = buildPostMeta({
     post: virtualPost(input.title, input.description),
     siteConfig: input.siteConfig,
     url: input.url,
   })
+  const links: Array<{ rel: string; href: string }> = []
+  if (input.pagination) {
+    const { current, total, baseUrl } = input.pagination
+    const base = baseUrl.replace(/\/$/, "")
+    if (current > 1) {
+      const prevHref = current === 2 ? `${base}/` : `${base}/page/${current - 1}/`
+      links.push({ rel: "prev", href: new URL(prevHref, input.siteConfig.baseUrl).toString() })
+    }
+    if (current < total) {
+      const nextHref = `${base}/page/${current + 1}/`
+      links.push({ rel: "next", href: new URL(nextHref, input.siteConfig.baseUrl).toString() })
+    }
+  }
   // Listing pages are "website" not "article"
-  return { ...meta, og: { ...meta.og, type: "website" } }
+  return {
+    ...meta,
+    og: { ...meta.og, type: "website" },
+    ...(links.length > 0 ? { links } : {}),
+  }
 }
 
 export function prepareIndexPage(input: {
@@ -89,16 +107,20 @@ export function prepareIndexPage(input: {
     ? `Latest posts from ${siteConfig.siteName}, page ${page}`
     : `Latest posts from ${siteConfig.siteName}`
 
+  const pagination = total !== undefined ? { current: page ?? 1, total } : undefined
   return {
     title,
     crumbs: [],
     posts,
-    pagination: total !== undefined ? { current: page ?? 1, total } : undefined,
+    pagination,
     meta: buildListingMeta({
       title: `${siteConfig.siteName} — ${title}`,
       description,
       url,
       siteConfig,
+      pagination: pagination
+        ? { ...pagination, baseUrl: siteConfig.blogBasePath }
+        : undefined,
     }),
     jsonLd: organizationSchema(siteConfig),
   }

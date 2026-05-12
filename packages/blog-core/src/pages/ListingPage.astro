@@ -3,12 +3,19 @@
  * Engine-side listing page renderer. Used by the per-site index, tag,
  * category, author, and paginated-index pages.
  *
- * Per-site usage:
+ * Renders posts as a 3-column responsive card grid with a 16:9 featured
+ * image at the top of every card (falls back to siteConfig.cards.fallbackImage
+ * when a post has no featuredImage). Ships <ClientRouter /> for smooth
+ * cross-page navigation and a "Load more" button that fetches the next
+ * paginated page and appends its cards into the grid without a full reload.
+ *
+ * Per-site usage stays unchanged:
  *   const data = prepareTagPage({ tag, posts, siteConfig })
  *   <BaseLayout meta={data.meta} jsonLd={data.jsonLd}>
  *     <ListingPage data={data} siteConfig={siteConfig} />
  *   </BaseLayout>
  */
+import { ClientRouter } from "astro:transitions"
 import type { ListingPageData } from "./prepareListingPage.js"
 import type { SiteConfig } from "../schemas/site.js"
 import Breadcrumbs from "../components/Breadcrumbs.astro"
@@ -23,9 +30,16 @@ interface Props {
 
 const { data, siteConfig } = Astro.props
 const { title, subtitle, crumbs, posts, pagination, author } = data
+const fallbackImage = siteConfig.cards?.fallbackImage
+const loadMoreEnabled = siteConfig.cards?.loadMore !== false
+const base = siteConfig.blogBasePath.replace(/\/$/, "")
+const hasMorePages = !!pagination && pagination.current < pagination.total
+const nextPageUrl = hasMorePages ? `${base}/page/${pagination!.current + 1}/` : ""
 ---
 
-<div class="mx-auto max-w-3xl">
+<ClientRouter />
+
+<div class="mx-auto max-w-7xl">
   {crumbs.length > 0 && <Breadcrumbs items={crumbs} />}
 
   <h1 class={`font-heading text-4xl font-bold text-primary${crumbs.length > 0 ? " mt-4" : ""}`}>
@@ -44,10 +58,33 @@ const { title, subtitle, crumbs, posts, pagination, author } = data
   {posts.length === 0 ? (
     <p class="mt-10 text-muted">No posts here yet.</p>
   ) : (
-    <div class="mt-8 space-y-6">
+    <div
+      id="shipwreck-card-grid"
+      data-current-page={pagination?.current ?? 1}
+      data-total-pages={pagination?.total ?? 1}
+      class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    >
       {posts.map((post) => (
-        <PostCard post={post} basePath={siteConfig.blogBasePath} variant="list" />
+        <PostCard
+          post={post}
+          basePath={siteConfig.blogBasePath}
+          variant="card"
+          fallbackImage={fallbackImage}
+        />
       ))}
+    </div>
+  )}
+
+  {hasMorePages && loadMoreEnabled && (
+    <div class="mt-10 flex justify-center">
+      <button
+        type="button"
+        id="shipwreck-load-more"
+        data-next-url={nextPageUrl}
+        class="rounded-button border border-border bg-bg-elevated px-6 py-3 text-sm font-semibold uppercase tracking-wide text-primary shadow-card transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        Load more
+      </button>
     </div>
   )}
 
@@ -59,3 +96,51 @@ const { title, subtitle, crumbs, posts, pagination, author } = data
     />
   )}
 </div>
+
+<script>
+  // Load-more: fetch the next static page (already pre-rendered), pull its grid
+  // children out of the response, and append them into the current grid.
+  // Preserves SEO (the paginated URLs still exist + still get indexed) while
+  // giving the visitor a no-reload experience. Re-binds on Astro view transitions.
+  function initLoadMore() {
+    const btn = document.getElementById("shipwreck-load-more") as HTMLButtonElement | null
+    const grid = document.getElementById("shipwreck-card-grid")
+    if (!btn || !grid) return
+
+    btn.addEventListener("click", async () => {
+      const nextUrl = btn.dataset.nextUrl
+      if (!nextUrl) return
+      const originalLabel = btn.textContent
+      btn.disabled = true
+      btn.textContent = "Loading…"
+      try {
+        const res = await fetch(nextUrl, { headers: { Accept: "text/html" } })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const html = await res.text()
+        const doc = new DOMParser().parseFromString(html, "text/html")
+        const nextGrid = doc.getElementById("shipwreck-card-grid")
+        if (!nextGrid) throw new Error("next page missing card grid")
+        const incoming = Array.from(nextGrid.children)
+        incoming.forEach((node) => grid.appendChild(node))
+
+        const current = parseInt(nextGrid.dataset.currentPage ?? "0", 10)
+        const total = parseInt(nextGrid.dataset.totalPages ?? "0", 10)
+        grid.dataset.currentPage = String(current)
+        if (current >= total) {
+          btn.remove()
+        } else {
+          const base = nextUrl.replace(/page\/\d+\/?$/, "")
+          btn.dataset.nextUrl = `${base}page/${current + 1}/`
+          btn.disabled = false
+          btn.textContent = originalLabel
+        }
+      } catch (err) {
+        console.error("[shipwreck] load-more failed:", err)
+        btn.disabled = false
+        btn.textContent = originalLabel
+      }
+    })
+  }
+
+  document.addEventListener("astro:page-load", initLoadMore)
+</script>

@@ -1,7 +1,7 @@
 {
   "name": "@shipwreck/blog-core",
-  "version": "0.3.9",
-  "description": "Core engine for Shipwreck Blog — schema, components, SEO helpers",
+  "version": "0.3.11",
+  "description": "Core engine for Shipwreck Blog \u2014 schema, components, SEO helpers",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {

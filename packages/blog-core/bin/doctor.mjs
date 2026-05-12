@@ -205,6 +205,23 @@ function seedPosts() {
     console.log(`  ✓ wrote ${dest.replace(CWD, ".")}`)
   }
 
+  // Copy the bundled seed hero image into public/uploads/ so seed posts have
+  // a working featuredImage out of the box (v0.3.11 — heroes are now required).
+  // Real heroes per-post should be generated via NyXi's image-gen flow on first
+  // edit; this placeholder keeps the doctor gate green until then.
+  const seedHeroSrc = join(templatesDir, "seed-hero.svg")
+  if (existsSync(seedHeroSrc)) {
+    const uploadsDir = resolve(blogRoot, "public", "uploads")
+    if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true })
+    const heroDest = join(uploadsDir, "seed-hero.svg")
+    if (!existsSync(heroDest)) {
+      writeFileSync(heroDest, readFileSync(seedHeroSrc, "utf8"))
+      console.log(`  ✓ wrote ${heroDest.replace(CWD, ".")}`)
+    } else {
+      console.log(`  skip: ${heroDest.replace(CWD, ".")} already exists`)
+    }
+  }
+
   // Write seed author
   const seedAuthorTemplate = join(templatesDir, "authors", "seed-author.json")
   if (existsSync(seedAuthorTemplate)) {
@@ -443,9 +460,92 @@ ${phase9Summary}
   process.exit(0)
 }
 
+// ---------- heroes subcommand: list missing heroes + dump art direction ----------
+// Used by NyXi (or any agent) before generating hero images. Emits machine-readable
+// data so the calling agent can drive its image-gen tool without re-parsing posts.
+//
+//   npx shipwreck-blog-doctor heroes           # human-readable
+//   npx shipwreck-blog-doctor heroes --json    # machine-readable
+function heroesReport(opts = {}) {
+  const wantJson = opts.json
+  const postsDirs = ["src/content/posts", "_blog/src/content/posts"]
+    .map((p) => resolve(CWD, p))
+    .filter((p) => existsSync(p))
+
+  const missing = []
+  for (const postsDir of postsDirs) {
+    const files = readdirSync(postsDir).filter((f) => f.endsWith(".mdx") || f.endsWith(".md"))
+    for (const f of files) {
+      const full = join(postsDir, f)
+      const text = readFileSync(full, "utf8")
+      const fmMatch = text.match(/^---\n([\s\S]*?)\n---/)
+      if (!fmMatch) continue
+      const fm = fmMatch[1]
+      const statusMatch = fm.match(/^status\s*:\s*["']?([a-z]+)["']?/m)
+      const status = statusMatch ? statusMatch[1] : "published"
+      if (status !== "published") continue
+      const hasHero = /^featuredImage\s*:\s*["']?[^"'\s][^\n]*$/m.test(fm)
+      if (!hasHero) {
+        const titleMatch = fm.match(/^title\s*:\s*["']?(.+?)["']?\s*$/m)
+        const excerptMatch = fm.match(/^excerpt\s*:\s*["']?(.+?)["']?\s*$/m)
+        missing.push({
+          path: full.replace(CWD, "."),
+          slug: f.replace(/\.(md|mdx)$/, ""),
+          title: titleMatch ? titleMatch[1] : f,
+          excerpt: excerptMatch ? excerptMatch[1] : undefined,
+        })
+      }
+    }
+  }
+
+  const adCandidates = ["..", "."]
+    .map((p) => resolve(CWD, p, ".shipwreck/art-direction.json"))
+  const adPath = adCandidates.find((p) => existsSync(p))
+  let artDirection = null
+  if (adPath) {
+    try { artDirection = JSON.parse(readFileSync(adPath, "utf8")) } catch { /* ignore */ }
+  }
+
+  if (wantJson) {
+    console.log(JSON.stringify({
+      contractVersion: COMPLETION_CONTRACT_VERSION,
+      missingHeroes: missing,
+      artDirection,
+      artDirectionPath: adPath ? adPath.replace(CWD, ".") : null,
+    }, null, 2))
+    return
+  }
+
+  if (missing.length === 0) {
+    console.log("All published posts have featuredImage set.")
+  } else {
+    console.log(`Missing heroes for ${missing.length} published post(s):`)
+    for (const m of missing) console.log(`  - ${m.slug}: ${m.title}`)
+  }
+  console.log()
+  if (artDirection) {
+    console.log(`Art direction (from ${adPath.replace(CWD, ".")}):`)
+    console.log(`  style:        ${artDirection.style ?? "<unset>"}`)
+    if (artDirection.subjectHint) console.log(`  subjectHint:  ${artDirection.subjectHint}`)
+    if (artDirection.palette) console.log(`  palette:      ${artDirection.palette.join(", ")}`)
+    console.log(`  aspectRatio:  ${artDirection.aspectRatio ?? "16:9"}`)
+    if (artDirection.avoid) console.log(`  avoid:        ${artDirection.avoid.join(", ")}`)
+    if (artDirection.notes) console.log(`  notes:        ${artDirection.notes}`)
+    console.log(`  source:       ${artDirection.source}`)
+  } else {
+    console.log("No .shipwreck/art-direction.json found yet — on first hero generation, prompt")
+    console.log("the user for art direction or screenshot the homepage to derive one, then")
+    console.log("write the file at <site-repo>/.shipwreck/art-direction.json.")
+  }
+}
+
 // ---------- subcommand dispatch (after all helpers are defined) ----------
 
 if (SUBCOMMAND === "seed-posts") { seedPosts(); process.exit(0) }
+if (SUBCOMMAND === "heroes") {
+  heroesReport({ json: args.has("--json") })
+  process.exit(0)
+}
 if (SUBCOMMAND === "attest-start") { attestStart(); process.exit(0) }
 if (SUBCOMMAND === "attest-phase9") { attestPhase9(argv.slice(1)); process.exit(0) }
 if (SUBCOMMAND === "attest-feedback") { attestFeedback(argv.slice(1)); process.exit(0) }
@@ -621,6 +721,68 @@ if (!PREFLIGHT) {
   }
 }
 
+// 5d. Hero image policy enforcement (v0.3.11+). For SEO-first blogs every published
+// post needs a featured image — it drives the OG card, the in-page hero, every
+// listing card, and image-search discoverability. Doctor reads heroes.policy
+// from site.config.ts; "required" (default) fails fatal on any published post
+// missing featuredImage; "optional" warns. Skipped in preflight (this is an
+// integration-time / authoring concern, not an install concern).
+if (!PREFLIGHT) {
+  const heroPostsDirs = ["src/content/posts", "_blog/src/content/posts"]
+    .map((p) => resolve(CWD, p))
+    .filter((p) => existsSync(p))
+
+  // Read heroes.policy from site.config.ts textually (doctor.mjs can't import TS).
+  // Default to "required" if config is missing or doesn't mention heroes block.
+  let heroPolicy = "required"
+  if (siteConfigPath) {
+    const cfg = readFileSync(siteConfigPath, "utf8")
+    const m = cfg.match(/heroes\s*:\s*\{[^}]*policy\s*:\s*["']([a-z]+)["']/)
+    if (m && (m[1] === "required" || m[1] === "optional")) heroPolicy = m[1]
+  }
+
+  for (const postsDir of heroPostsDirs) {
+    const postFiles = readdirSync(postsDir).filter((f) => f.endsWith(".mdx") || f.endsWith(".md"))
+    const offenders = []
+    for (const f of postFiles) {
+      const full = join(postsDir, f)
+      const text = readFileSync(full, "utf8")
+      const fmMatch = text.match(/^---\n([\s\S]*?)\n---/)
+      if (!fmMatch) continue
+      const fm = fmMatch[1]
+      const statusMatch = fm.match(/^status\s*:\s*["']?([a-z]+)["']?/m)
+      const status = statusMatch ? statusMatch[1] : "published" // schema default
+      if (status !== "published") continue
+      const hasHero = /^featuredImage\s*:\s*["']?[^"'\s][^\n]*$/m.test(fm)
+      if (!hasHero) offenders.push(f)
+    }
+
+    if (offenders.length === 0) {
+      pass(
+        "Every published post has a featuredImage",
+        `${postFiles.length} post(s) checked in ${postsDir.replace(CWD, ".")}`,
+      )
+    } else if (heroPolicy === "required") {
+      const adPath = ["..", "."]
+        .map((p) => resolve(CWD, p, ".shipwreck/art-direction.json"))
+        .find((p) => existsSync(p))
+      const adHint = adPath
+        ? `Art direction is set at ${adPath.replace(CWD, ".")} — run the hero generation flow from the add-post skill.`
+        : `No .shipwreck/art-direction.json found yet — running the hero generation flow will create one on first use.`
+      fail(
+        "Published posts missing featuredImage (heroes.policy = required)",
+        `${offenders.length} post(s): ${offenders.join(", ")}. Every published post needs a 16:9 hero. ${adHint} ` +
+          `To temporarily silence this check during migration, set heroes.policy = "optional" in site.config.ts.`,
+      )
+    } else {
+      warning(
+        "Published posts missing featuredImage (heroes.policy = optional)",
+        `${offenders.length} post(s): ${offenders.join(", ")}. These will render with the fallback card image but lack a unique OG card on social.`,
+      )
+    }
+  }
+}
+
 // 6. Source-vs-deploy layout guardrail (Nyxi feedback #6)
 // The blog SOURCE repo should not be the same dir as the host's static MOUNT path.
 // If you accidentally point your blog source at the host's docroot, you'll
@@ -660,7 +822,11 @@ if (!SKIP_BUILD) {
       fail("Built dist has no CSS files", `Expected at least one .css under ${distCssDir}`)
     } else {
       const allCss = cssFiles.map((f) => readFileSync(join(distCssDir, f), "utf8")).join("\n")
-      const expected = ["max-w-7xl", "max-w-3xl", "text-4xl", "font-heading", "lg\\:hidden", "hidden", "not-prose"]
+      // Sentinel utility classes from engine page renderers. Updated for v0.3.10:
+      // ListingPage moved from max-w-3xl to max-w-7xl + 3-col card grid; max-w-3xl
+      // no longer appears in any engine page. lg:grid-cols-3 + rounded-card
+      // sentinels guard against the card-grid regression.
+      const expected = ["max-w-7xl", "lg\\:grid-cols-3", "rounded-card", "text-4xl", "font-heading", "lg\\:hidden", "hidden", "not-prose"]
       const missing = expected.filter((cls) => !allCss.includes(cls))
       if (missing.length > 0) {
         fail(

@@ -6,37 +6,56 @@ interface Props {
   basePath: string
   /** "card" (default) — bordered, padded, hover-elevates. "list" — bottom-bordered list item, no frame. */
   variant?: "card" | "list"
+  /** Fallback featured image when the post has none. Used by the card variant on listing pages. */
+  fallbackImage?: string
 }
 
-const { post, basePath, variant = "card" } = Astro.props
+const { post, basePath, variant = "card", fallbackImage } = Astro.props
 const href = `${basePath.replace(/\/$/, "")}/${post.id}/`
-const image = post.data.featuredImage
-const altText = post.data.featuredImageAlt ?? post.data.title
+const image = post.data.featuredImage ?? (variant === "card" ? fallbackImage : undefined)
+const isFallback = !post.data.featuredImage && !!image
+const altText = post.data.featuredImageAlt ?? (isFallback ? "" : post.data.title)
 
 const wrapperClass = variant === "list"
   ? "border-b border-border pb-6 last:border-b-0"
-  : "group rounded-card border border-border bg-bg/40 p-5 transition-colors hover:border-accent/60 hover:bg-bg/60"
+  : "group flex h-full flex-col overflow-hidden rounded-card border border-border bg-bg-elevated shadow-card transition-colors hover:border-accent/60"
 ---
 
 <article class={wrapperClass}>
-  <a href={href} class:list={["block", variant === "list" && "group"]}>
-    {image && (
-      <img
-        src={image}
-        alt={altText}
-        class="mb-4 aspect-[16/9] w-full rounded-card object-cover"
-        loading="lazy"
-      />
+  <a href={href} class:list={["flex h-full flex-col", variant === "list" && "group"]}>
+    {variant === "card" ? (
+      <div class="aspect-[16/9] w-full overflow-hidden bg-bg/40">
+        {image && (
+          <img
+            src={image}
+            alt={altText}
+            aria-hidden={isFallback ? "true" : undefined}
+            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            loading="lazy"
+          />
+        )}
+      </div>
+    ) : (
+      image && (
+        <img
+          src={image}
+          alt={altText}
+          class="mb-4 aspect-[16/9] w-full rounded-card object-cover"
+          loading="lazy"
+        />
+      )
     )}
-    <h3 class="font-heading text-lg font-semibold leading-snug text-primary group-hover:text-accent">
-      {post.data.title}
-    </h3>
-    {post.data.excerpt && <p class="mt-2 text-sm leading-relaxed text-muted">{post.data.excerpt}</p>}
-    <p class="mt-3 text-xs uppercase tracking-wide text-muted/80">
-      <time datetime={post.data.publishDate.toISOString()}>
-        {post.data.publishDate.toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric" })}
-      </time>
-      {post.data.category && <> · {post.data.category}</>}
-    </p>
+    <div class:list={[variant === "card" && "flex flex-1 flex-col p-5"]}>
+      <h3 class="font-heading text-lg font-semibold leading-snug text-primary group-hover:text-accent">
+        {post.data.title}
+      </h3>
+      {post.data.excerpt && <p class="mt-2 text-sm leading-relaxed text-muted">{post.data.excerpt}</p>}
+      <p class:list={["text-xs uppercase tracking-wide text-muted/80", variant === "card" ? "mt-auto pt-4" : "mt-3"]}>
+        <time datetime={post.data.publishDate.toISOString()}>
+          {post.data.publishDate.toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric" })}
+        </time>
+        {post.data.category && <> · {post.data.category}</>}
+      </p>
+    </div>
   </a>
 </article>

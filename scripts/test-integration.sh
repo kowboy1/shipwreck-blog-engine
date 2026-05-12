@@ -164,7 +164,7 @@ if [[ $CSS_SIZE_BYTES -lt 15000 ]]; then
 fi
 ok "Built CSS size sanity (${CSS_SIZE_BYTES} bytes — engine classes appear scanned)"
 
-REQUIRED_CLASSES=(max-w-7xl max-w-3xl text-4xl font-heading not-prose 'lg\\:hidden')
+REQUIRED_CLASSES=(max-w-7xl 'lg\\:grid-cols-3' rounded-card text-4xl font-heading not-prose 'lg\\:hidden')
 for class in "${REQUIRED_CLASSES[@]}"; do
   if grep -q "$class" "$CSS_FILE"; then
     ok "CSS contains engine class: $class"
@@ -329,6 +329,60 @@ else
 fi
 rm -rf "$TEST_STATE_DIR"
 cd "$TEST_SITE"
+
+# ---------- v0.3.11: heroes.policy enforcement ----------
+# Default policy is "required" — every published post must have featuredImage.
+# Demo posts ship with featuredImage now, so --lite should NOT flag missing heroes.
+LITE_HEROES_OUT=$(npm run doctor -- --lite --skip-build 2>&1 || true)
+if echo "$LITE_HEROES_OUT" | grep -q "Every published post has a featuredImage"; then
+  ok "Doctor passes heroes check when every published post has featuredImage"
+else
+  fail "Doctor did not confirm heroes present on demo posts (heroes check broken)"
+fi
+
+# Negative test: write a post with no featuredImage and assert doctor flags it.
+TEST_NO_HERO="$TEST_SITE/src/content/posts/no-hero-test.mdx"
+cat > "$TEST_NO_HERO" <<'MDX'
+---
+title: "Post without a hero"
+publishDate: 2026-05-12
+status: "published"
+author: "rick"
+category: "test"
+tags: ["test"]
+---
+
+Body.
+MDX
+NEG_OUT=$(npm run doctor -- --lite --skip-build 2>&1 || true)
+if echo "$NEG_OUT" | grep -q "Published posts missing featuredImage"; then
+  ok "Doctor fails heroes check when a published post lacks featuredImage"
+else
+  fail "Doctor did NOT flag post lacking featuredImage (heroes policy not enforcing)"
+fi
+rm -f "$TEST_NO_HERO"
+
+# heroes subcommand emits machine-readable JSON
+# (write the no-hero post back briefly to verify the subcommand reports it)
+cat > "$TEST_NO_HERO" <<'MDX'
+---
+title: "Post without a hero"
+publishDate: 2026-05-12
+status: "published"
+author: "rick"
+category: "test"
+tags: ["test"]
+---
+
+Body.
+MDX
+HEROES_JSON=$(node "$ENGINE_REPO/packages/blog-core/bin/doctor.mjs" heroes --json 2>&1 || true)
+if echo "$HEROES_JSON" | grep -q '"slug": "no-hero-test"'; then
+  ok "Doctor heroes --json subcommand reports missing-hero posts"
+else
+  fail "Doctor heroes --json did not include missing-hero post"
+fi
+rm -f "$TEST_NO_HERO"
 
 # ---------- summary ----------
 
