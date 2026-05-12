@@ -18,12 +18,21 @@ import { remarkStripDuplicateH1 } from "./remark/strip-duplicate-h1.mjs"
 export interface ShipwreckBlogOptions {
   /** Additional remark plugins to append after the engine's defaults */
   extraRemarkPlugins?: unknown[]
+  /**
+   * Astro's inlineStylesheets setting. Default "auto" — Astro inlines small
+   * CSS chunks (under ~4KB) into the HTML and leaves larger ones as
+   * external requests. Tiny FCP win, no LCP regression. "always" inlines
+   * everything (faster FCP, larger initial HTML payload — riskier for
+   * sites with heavy component-scoped CSS). "never" disables.
+   * SEO-first default: "auto".
+   */
+  inlineStylesheets?: "auto" | "always" | "never"
 }
 
 export default function shipwreckBlog(
   options: ShipwreckBlogOptions = {},
 ): AstroIntegration {
-  const { extraRemarkPlugins = [] } = options
+  const { extraRemarkPlugins = [], inlineStylesheets = "auto" } = options
 
   return {
     name: "@shipwreck/blog-core",
@@ -35,6 +44,9 @@ export default function shipwreckBlog(
               remarkStripDuplicateH1,
               ...extraRemarkPlugins,
             ],
+          },
+          build: {
+            inlineStylesheets,
           },
         })
       },

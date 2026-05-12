@@ -8,6 +8,66 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.19] - 2026-05-12
+
+Engine-side automation for the three biggest "self-serve" SEO surfaces flagged in the 0.3.18 audit follow-up: intrinsic image dimensions auto-probed at build time (no manual frontmatter), inline-stylesheets enabled at the integration layer for FCP, and full E-E-A-T author Schema.org Person emitted automatically from the existing author JSON files.
+
+### Added: build-time image dimension autodetect
+
+`@shipwreck/blog-core/utils/image-size` exports `probeFeaturedImageSize({ featuredImage })` — a zero-dependency probe that reads the first ~24 bytes of an image file on disk and returns `{ width, height }`. Format support:
+
+- **SVG** — parses `viewBox` first, falls back to `<svg width=/height=>` attrs
+- **PNG** — IHDR chunk, big-endian uint32s
+- **JPEG** — scans SOF markers (0xFFC0–0xFFCF excl. 0xFFC4/0xFFC8/0xFFCC)
+- Other formats / remote URLs / data URIs → returns undefined, engine falls back to 1200×675 defaults
+
+`preparePostPageData` runs the probe whenever a post has `featuredImage` but is missing `featuredImageWidth/Height`. Frontmatter override always wins; the probe only fills in missing values.
+
+Effect: `<img width=/height=>`, `og:image:width/height`, and `Article.image.{width,height}` all reflect the actual image dimensions without authors lifting a finger. WW's `og-image.svg` (`viewBox="0 0 1600 900"`) now flows as 1600×900 throughout the post HTML — verified in the new integration assertion.
+
+Probe runs synchronously on local files only; no HTTP / no native bindings.
+
+### Added: `inlineStylesheets` config in the engine integration
+
+`shipwreckBlog({ inlineStylesheets: "auto" })` (default `"auto"`) — switches Astro 5's build-level CSS inlining on. Astro inlines CSS chunks under ~4KB into HTML, leaving larger files external. Small FCP win on every page with effectively zero risk; `"always"` and `"never"` available for sites that want to override.
+
+### Added: author E-E-A-T schema (auto-emitted)
+
+`authorSchema` extended with optional E-E-A-T fields:
+
+```ts
+{
+  // existing: name, bio, avatar, url, twitter, linkedin, email
+  description?: string         // longer-form bio for Schema.org Person.description
+  github?: string              // handle OR full URL — engine resolves to https://github.com/<handle>
+  mastodon?: string            // full URL (server-specific)
+  website?: string             // distinct personal/professional URL
+  jobTitle?: string            // Schema.org Person.jobTitle
+  worksFor?: string            // Schema.org Person.worksFor.name (emitted as nested Organization)
+  knowsAbout?: string[]        // Schema.org Person.knowsAbout — Google's E-E-A-T topical-expertise signal
+  alumniOf?: string            // Schema.org Person.alumniOf.name (nested EducationalOrganization)
+  contributorSince?: string    // ISO date — Experience signal
+}
+```
+
+New helper `buildPersonSchema(author)` constructs a fully-populated Schema.org Person from an author record, including auto-built `sameAs[]` from `twitter` / `linkedin` / `github` / `mastodon` / `website` / `url`. Twitter handles normalise to `@handle` form; github accepts `@handle`, `handle`, or full URL.
+
+`articleSchema` gained an optional `record` field on `ArticleAuthor`. `preparePostPageData` passes the full author record through automatically. Result: when an author JSON has the E-E-A-T fields filled in, the post's `Article.author` JSON-LD is no longer a stub `{ @type: Person, name, url }` — it's a fully-formed Person with all the E-E-A-T signals Google evaluates for author authority.
+
+Demo `rick.json` author updated to exercise every new field as a reference example.
+
+### Integration test: 79/79 (4 new assertions)
+
+- SVG dimension probe honoured (1600×900 from viewBox, not engine 1200×675 default)
+- `og:image:width` reflects autodetected dimensions
+- `Article.author` JSON-LD includes `knowsAbout`, `jobTitle`, `sameAs`
+
+### Migration from 0.3.18
+
+No consumer changes required. To exercise the new author fields, fill in the optional E-E-A-T properties on existing author JSON files. The engine emits only what's set — partial author records work fine.
+
+For build-level inline-stylesheets opt-out (rare): `shipwreckBlog({ inlineStylesheets: "never" })`.
+
 ## [0.3.18] - 2026-05-12
 
 Closes the SEO audit gap — ships every automatable improvement from the haiku-driven technical-SEO review in one batch. Built post + listing HTML now carries: image dimensions for CLS, og:image:width/height/alt, twitter:image:alt + twitter:creator, Schema.org wordCount + inLanguage + dateCreated + ImageObject typed image, publisher logo dimensions, CollectionPage JSON-LD on archives, RSS rel=alternate everywhere, LCP preload hint for the hero image, image sitemap, robots.txt that advertises it, optional thin-archive noindex.

@@ -27,6 +27,7 @@ import { rankRelatedPosts } from "../utils/related.js"
 import { readingTimeLabel } from "../utils/reading-time.js"
 import { getPostAuthorIds } from "../utils/authors.js"
 import { loadPopularityFile, selectPopularPosts } from "../utils/popularity.js"
+import { probeFeaturedImageSize } from "../utils/image-size.js"
 
 interface PostEntry {
   id: string
@@ -116,6 +117,9 @@ export async function preparePostPageData(
   const articleAuthors: ArticleAuthor[] = authors.map(({ data }) => ({
     name: data.name,
     ...(data.url ? { url: data.url } : {}),
+    // Pass the full record so articleSchema emits E-E-A-T Person fields
+    // (sameAs, knowsAbout, jobTitle, worksFor, alumniOf, description).
+    record: data,
   }))
 
   // Reading time / word count (extracted here so it can feed both the byline
@@ -127,6 +131,20 @@ export async function preparePostPageData(
   const readingLabel = wordCount
     ? readingTimeLabel("x ".repeat(wordCount))
     : undefined
+
+  // Auto-detect intrinsic image dimensions (CLS prevention + SEO image dims).
+  // Frontmatter override always wins; probe runs only when at least one
+  // dimension is missing. Format support: SVG, PNG, JPEG (others fall back
+  // to engine defaults 1200×675 via buildPostMeta).
+  if (post.data.featuredImage &&
+      (post.data.featuredImageWidth === undefined ||
+       post.data.featuredImageHeight === undefined)) {
+    const probed = probeFeaturedImageSize({ featuredImage: post.data.featuredImage })
+    if (probed) {
+      if (post.data.featuredImageWidth === undefined) post.data.featuredImageWidth = probed.width
+      if (post.data.featuredImageHeight === undefined) post.data.featuredImageHeight = probed.height
+    }
+  }
 
   // Primary author's twitter handle → twitter:creator (separate from
   // twitter:site which is the org account).

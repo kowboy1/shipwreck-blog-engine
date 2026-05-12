@@ -1,5 +1,18 @@
 {
   "name": "Rick",
   "bio": "Builder of Shipwreck. Writes about web ops, SEO, and shipping fast.",
-  "url": "https://shipwreck.studio"
+  "description": "Founder of Shipwreck Studio. Spends most days at the intersection of SEO, web ops, and shipping things faster than the alternative. Background in agency lead generation, custom CMSes, and helping small businesses out-rank platforms 10× their size.",
+  "url": "https://shipwreck.studio",
+  "website": "https://shipwreck.studio",
+  "twitter": "shipwreckstudio",
+  "github": "kowboy1",
+  "jobTitle": "Founder & engineer",
+  "worksFor": "Shipwreck Studio",
+  "knowsAbout": [
+    "technical SEO",
+    "Astro and static site engines",
+    "WordPress alternatives",
+    "Cloudflare and edge deployment"
+  ],
+  "contributorSince": "2026-04-01"
 }

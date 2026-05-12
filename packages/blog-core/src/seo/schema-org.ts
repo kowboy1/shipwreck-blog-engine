@@ -1,9 +1,15 @@
-import type { Post, SiteConfig, FaqItem } from "../schemas/index.js"
+import type { Post, SiteConfig, FaqItem, AuthorRecord } from "../schemas/index.js"
+import { buildPersonSchema } from "../schemas/author.js"
 import { DEFAULT_OG_IMAGE_WIDTH, DEFAULT_OG_IMAGE_HEIGHT } from "./meta.js"
 
 export interface ArticleAuthor {
   name: string
   url?: string
+  /** Full author record — when provided, the engine emits a fully-populated
+   *  Schema.org Person with E-E-A-T fields (sameAs, knowsAbout, jobTitle,
+   *  worksFor, etc.) instead of a bare { @type: Person, name, url } stub.
+   *  preparePostPageData passes this through when authors are resolved. */
+  record?: AuthorRecord
 }
 
 export function articleSchema(args: {
@@ -29,16 +35,24 @@ export function articleSchema(args: {
         ? [{ name: authorName, ...(authorUrl ? { url: authorUrl } : {}) }]
         : []
 
+  // Build Schema.org author JSON-LD. When a full AuthorRecord is available
+  // (passed in via `.record`), emit the rich E-E-A-T Person via
+  // buildPersonSchema. Otherwise fall back to the minimal Person stub
+  // (backward-compat for legacy callers).
+  const personFromAuthor = (a: ArticleAuthor): Record<string, unknown> => {
+    if (a.record) return buildPersonSchema(a.record)
+    return {
+      "@type": "Person",
+      name: a.name,
+      ...(a.url ? { url: a.url } : {}),
+    }
+  }
   const authorJsonLd =
     authorList.length === 0
       ? { "@type": "Organization", name: siteConfig.brand.organizationName }
       : authorList.length === 1
-        ? { "@type": "Person", name: authorList[0].name, ...(authorList[0].url ? { url: authorList[0].url } : {}) }
-        : authorList.map((a) => ({
-            "@type": "Person",
-            name: a.name,
-            ...(a.url ? { url: a.url } : {}),
-          }))
+        ? personFromAuthor(authorList[0])
+        : authorList.map(personFromAuthor)
 
   // image emitted as an ImageObject (with dimensions) when we have one —
   // Google's structured-data validator prefers this over a bare URL string.

@@ -342,6 +342,42 @@ else
   fail "/blog/ index MISSING RSS rel=alternate"
 fi
 
+# v0.3.19: image dimension autodetect — demo-hero.svg has viewBox="0 0 1600 900"
+# so the probed width/height should be 1600/900, NOT the engine default 1200/675.
+# Check the Article JSON-LD ImageObject and the og:image:width meta to confirm.
+if grep -qE '"width":1600,"height":900' "$POST_HTML"; then
+  ok "Image dimensions auto-probed from SVG viewBox (1600x900 not engine default)"
+else
+  fail "Image dimension autodetect failed (SVG viewBox not honoured)"
+fi
+if grep -q 'property="og:image:width" content="1600"' "$POST_HTML"; then
+  ok "og:image:width reflects autodetected dimensions (1600)"
+else
+  fail "og:image:width does not reflect autodetected dimensions"
+fi
+
+# v0.3.19: E-E-A-T author Person schema in Article JSON-LD.
+# hello-world.mdx is authored by `rick` whose JSON has knowsAbout/jobTitle/
+# sameAs-buildable fields. Verify the rich Person fields make it into JSON-LD.
+if grep -q '"knowsAbout"' "$POST_HTML"; then
+  ok "Article author JSON-LD includes E-E-A-T knowsAbout array"
+else
+  fail "Article author JSON-LD MISSING knowsAbout (E-E-A-T not flowing)"
+fi
+if grep -q '"jobTitle"' "$POST_HTML"; then
+  ok "Article author JSON-LD includes jobTitle"
+else
+  fail "Article author JSON-LD MISSING jobTitle"
+fi
+if grep -q '"sameAs"' "$POST_HTML"; then
+  ok "Article author JSON-LD includes sameAs[] from twitter/github/website"
+else
+  fail "Article author JSON-LD MISSING sameAs"
+fi
+if grep -qE 'inlineStylesheets|<style>' "$POST_HTML"; then
+  ok "Inline-stylesheets active (some CSS in <style> blocks)"
+fi
+
 # v0.3.18: every <img> in built post page has width + height + decoding="async"
 TOTAL_IMGS=$(grep -oE '<img\b[^>]*>' "$POST_HTML" | wc -l)
 IMGS_WITH_W=$(grep -oE '<img\b[^>]*width=' "$POST_HTML" | wc -l)
