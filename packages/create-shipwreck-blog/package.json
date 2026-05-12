@@ -1,6 +1,6 @@
 {
   "name": "create-shipwreck-blog",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "description": "Scaffold a Shipwreck blog into an existing site",
   "type": "module",
   "bin": {

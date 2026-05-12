@@ -99,6 +99,8 @@ export const siteConfigSchema = z.object({
           minSearchChars: z.number().int().positive().default(3),
           /** Debounce milliseconds for the search input. */
           searchDebounceMs: z.number().int().nonnegative().default(120),
+          /** Number of tag chips visible before the "See more" button hides the rest. */
+          tagsVisibleLimit: z.number().int().positive().default(6),
           heading: z.string().default("Filter"),
         })
         .default({}),

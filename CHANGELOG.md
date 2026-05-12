@@ -8,6 +8,42 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.15] - 2026-05-12
+
+Tag chip list now collapses to the top 6 by default, with a "See N more →" toggle that slides the rest open. Stops the sidebar getting unwieldy on tag-heavy sites while keeping every tag one click away.
+
+### Added: `listing.filters.tagsVisibleLimit`
+
+Configurable in `site.config.ts`:
+
+```ts
+listing: {
+  filters: {
+    tagsVisibleLimit: 6,  // default
+  }
+}
+```
+
+Top N tags (already sorted by post-count descending in the facets) render immediately; everything after `tagsVisibleLimit` lives behind the toggle. Set higher to show more upfront, set to a very large number to effectively disable the collapse.
+
+### Added: CSS-only collapse with `grid-template-rows` animation
+
+No JS needed for the toggle itself — uses the `<input type="checkbox" class="peer">` + `<label for="…">` pattern. The hidden chips live inside a wrapper that animates `grid-template-rows: 0fr → 1fr` over 300ms (the modern variable-height CSS technique — works in all current browsers including Firefox). Inner container retains `max-h-48 overflow-y-auto` so even sites with hundreds of tags don't blow out the sidebar height once expanded.
+
+`<input>` is `.sr-only` (visually hidden, still in DOM + tab order) so keyboard users can tab to it and toggle with space.
+
+### Added: auto-expand when an "extra" tag is active
+
+The small JS init step checks if any of the URL-loaded active tags live inside the collapsed group and auto-expands the toggle if so — otherwise users would see a filter applied with no visible chip, which is confusing on shared/bookmarked filtered URLs.
+
+### Reduced-motion respected
+
+The `grid-template-rows` transition is disabled under `@media (prefers-reduced-motion: reduce)`, alongside the existing View Transitions opt-out.
+
+### Migration
+
+None. Default of 6 visible kicks in automatically. Sites with ≤6 total tags see no change (the "See more" toggle only renders when there's actually overflow).
+
 ## [0.3.14] - 2026-05-12
 
 Polish pass on the 0.3.13 filter sidebar: native FLIP animation when cards sort/filter, and a search-input contrast fix for dark themes.

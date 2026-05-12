@@ -36,6 +36,9 @@ const showFeaturedToggle =
 const heading = cfg.heading ?? "Filter"
 const minSearchChars = cfg.minSearchChars ?? 3
 const searchDebounceMs = cfg.searchDebounceMs ?? 120
+const tagsVisibleLimit = cfg.tagsVisibleLimit ?? 6
+const visibleTags = facets.tags.slice(0, tagsVisibleLimit)
+const extraTags = facets.tags.slice(tagsVisibleLimit)
 ---
 
 <aside id="shipwreck-blog-filters" class="blog-filters not-prose lg:sticky lg:top-24">
@@ -123,8 +126,8 @@ const searchDebounceMs = cfg.searchDebounceMs ?? 120
       {showTags && (
         <div class="filter-section">
           <h3 class="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted">Tags</h3>
-          <div class="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto pr-1">
-            {facets.tags.map((t) => (
+          <div class="flex flex-wrap gap-1.5">
+            {visibleTags.map((t) => (
               <button
                 type="button"
                 data-filter-tag={t.slug}
@@ -136,6 +139,48 @@ const searchDebounceMs = cfg.searchDebounceMs ?? 120
               </button>
             ))}
           </div>
+          {extraTags.length > 0 && (
+            <>
+              <input
+                type="checkbox"
+                id="shipwreck-tags-more-toggle"
+                class="peer/tagsmore sr-only"
+                aria-controls="shipwreck-tags-extra"
+              />
+              <div
+                id="shipwreck-tags-extra"
+                class="grid grid-rows-[0fr] overflow-hidden transition-[grid-template-rows] duration-300 ease-out peer-checked/tagsmore:grid-rows-[1fr]"
+              >
+                <div class="min-h-0">
+                  <div class="mt-1.5 flex max-h-48 flex-wrap gap-1.5 overflow-y-auto pr-1">
+                    {extraTags.map((t) => (
+                      <button
+                        type="button"
+                        data-filter-tag={t.slug}
+                        aria-pressed="false"
+                        class="filter-chip inline-flex items-center gap-1 rounded-chip border border-border bg-bg/40 px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:border-accent/60 aria-pressed:border-accent aria-pressed:bg-accent/10 aria-pressed:text-accent"
+                      >
+                        <span>{t.slug}</span>
+                        <span class="text-[10px] text-muted/60 aria-pressed:text-accent/70">({t.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <label
+                for="shipwreck-tags-more-toggle"
+                class="mt-2 inline-block cursor-pointer text-[11px] font-semibold uppercase tracking-wider text-muted hover:text-accent peer-checked/tagsmore:hidden"
+              >
+                See {extraTags.length} more →
+              </label>
+              <label
+                for="shipwreck-tags-more-toggle"
+                class="mt-2 hidden cursor-pointer text-[11px] font-semibold uppercase tracking-wider text-muted hover:text-accent peer-checked/tagsmore:inline-block"
+              >
+                ← Show less
+              </label>
+            </>
+          )}
         </div>
       )}
 
@@ -241,6 +286,7 @@ const searchDebounceMs = cfg.searchDebounceMs ?? 120
     ::view-transition-new(*) {
       animation: none !important;
     }
+    #shipwreck-tags-extra { transition: none !important; }
   }
 </style>
 
@@ -559,6 +605,19 @@ const searchDebounceMs = cfg.searchDebounceMs ?? 120
 
       // Initial paint — restore from URL.
       readUrlState()
+      // If a filter is active on a tag that lives in the collapsed "extras"
+      // group, auto-expand the group so the user sees the active filter.
+      const extrasToggle = document.getElementById("shipwreck-tags-more-toggle")
+      const extrasGroup = document.getElementById("shipwreck-tags-extra")
+      if (extrasToggle && extrasGroup && state.tags.size > 0) {
+        const extraSlugs = new Set(
+          Array.from(extrasGroup.querySelectorAll("[data-filter-tag]"))
+            .map((el) => el.dataset.filterTag),
+        )
+        for (const t of state.tags) {
+          if (extraSlugs.has(t)) { extrasToggle.checked = true; break }
+        }
+      }
       // Only paint immediately if the URL has filters; otherwise leave the
       // SSR'd HTML in place to avoid a flicker.
       if (activeFilterCount() > 0 || state.sort === "oldest") {
