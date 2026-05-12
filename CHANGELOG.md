@@ -8,6 +8,52 @@ All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.14] - 2026-05-12
+
+Polish pass on the 0.3.13 filter sidebar: native FLIP animation when cards sort/filter, and a search-input contrast fix for dark themes.
+
+### Fixed: search input contrast on dark themes
+
+`#shipwreck-search` was using `bg-bg/40` (semi-transparent) + `text-primary`, which on a deep navy theme like Wollongong Weather rendered as near-white-on-white when the host site's `input` user-agent styling leaked through. Replaced with `bg-bg-elevated` (opaque, matches the surrounding `<details>` card surface) + `text-text` (always-contrasted body colour) + `caret-accent`. Added defensive CSS:
+
+- `::-webkit-search-cancel-button` redrawn with `currentColor` so the × is visible against any theme background
+- `:-webkit-autofill` shadow override so Chrome's yellow autofill doesn't bleed white through the field
+- `::placeholder` colour pinned to `var(--color-muted)` regardless of host styles
+- `color-scheme: dark light` hint so the OS doesn't restyle the field
+
+### Added: native View Transitions on filter / sort
+
+The grid's DOM swap during filter/sort actions is now wrapped in `document.startViewTransition(...)`. Browsers that support the View Transitions API (Chrome, Edge, Safari) cross-fade + FLIP cards into their new positions natively — no JS animation library, no external dependency.
+
+Per-card `view-transition-name: post-<slug>` is set both on:
+- the JS-rendered card template (subsequent re-renders)
+- the SSR'd cards at init via `tagSsrCards()` (so the FIRST filter action also runs as a named FLIP, consistent with later ones)
+
+Timing customisation lives in a small `is:global` `<style>` block:
+
+```css
+::view-transition-group(*) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+```
+
+### Reduced-motion respected
+
+The script checks `window.matchMedia("(prefers-reduced-motion: reduce)").matches` and skips the View Transition wrapper entirely when set. CSS also has a `@media (prefers-reduced-motion: reduce)` block setting `animation: none !important` on the transition pseudo-elements as a belt-and-braces fallback.
+
+### Fallback
+
+Firefox (no `document.startViewTransition` at time of writing) gets the instant DOM swap that 0.3.13 shipped — no regression, no animation, no error. Purely additive feature.
+
+### Integration test
+
+54/54 — same coverage as 0.3.13. View Transitions are a runtime behaviour (no DOM diff in the static-built HTML output), so no new test assertion was added; the existing sentinel + sidebar checks cover the feature surface.
+
+### Migration
+
+None. Consumer changes from 0.3.13 carry over unchanged. Browsers without View Transitions API still get the filter behaviour exactly as 0.3.13 shipped.
+
 ## [0.3.13] - 2026-05-12
 
 Live filter + search sidebar on `/blog/`. Pure client-side, no page reload, no extra HTTP fetch — all filter state runs against an embedded post manifest. Static SSR'd grid + `<Pagination>` remains intact so crawlers and JS-off users keep seeing everything.

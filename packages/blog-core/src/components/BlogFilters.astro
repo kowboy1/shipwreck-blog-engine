@@ -66,7 +66,7 @@ const searchDebounceMs = cfg.searchDebounceMs ?? 120
           placeholder="Search posts…"
           autocomplete="off"
           spellcheck="false"
-          class="w-full rounded-sm border border-border bg-bg/40 px-3 py-2 text-sm text-primary placeholder:text-muted/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-focus"
+          class="w-full rounded-sm border border-border bg-bg-elevated px-3 py-2 text-sm text-text caret-accent placeholder:text-muted/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-focus"
           data-min-chars={String(minSearchChars)}
           data-debounce-ms={String(searchDebounceMs)}
         />
@@ -190,6 +190,58 @@ const searchDebounceMs = cfg.searchDebounceMs ?? 120
     outline: 2px solid var(--color-focus-ring, #2563eb);
     outline-offset: 2px;
   }
+
+  /* Normalise <input type="search"> across user agents.
+     Webkit injects its own search-cancel button which can be invisible against
+     a dark theme background; force currentColor + restrained sizing. Also
+     defend against host CSS or autofill backgrounds bleeding white through. */
+  #shipwreck-search {
+    color-scheme: dark light;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  #shipwreck-search::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 14px;
+    width: 14px;
+    margin-left: 6px;
+    background:
+      linear-gradient(45deg, transparent 47%, currentColor 47%, currentColor 53%, transparent 53%),
+      linear-gradient(-45deg, transparent 47%, currentColor 47%, currentColor 53%, transparent 53%);
+    opacity: 0.55;
+    cursor: pointer;
+  }
+  #shipwreck-search::-webkit-search-cancel-button:hover { opacity: 1; }
+  #shipwreck-search::placeholder { color: var(--color-muted, #64748b); opacity: 0.7; }
+  /* Chrome autofill defends a yellow/white inset bg over our dark surface.
+     Replace it with our elevated surface + force readable text colour. */
+  #shipwreck-search:-webkit-autofill,
+  #shipwreck-search:-webkit-autofill:hover,
+  #shipwreck-search:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--color-text, #0f172a);
+    -webkit-box-shadow: 0 0 0 30px var(--color-bg-elevated, #f8fafc) inset;
+    box-shadow: 0 0 0 30px var(--color-bg-elevated, #f8fafc) inset;
+  }
+</style>
+
+<style is:global>
+  /* Native View Transitions for card filter/sort. Browser cross-fades + FLIPs
+     cards into new positions when the JS swaps the grid. No JS animation
+     library, no external CSS framework. Falls back to instant swap on browsers
+     without support (Firefox at time of writing) — feature is purely additive. */
+  ::view-transition-group(*) {
+    animation-duration: 280ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  /* Respect prefers-reduced-motion — skip the transition entirely. */
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation: none !important;
+    }
+  }
 </style>
 
 <script is:inline>
@@ -287,6 +339,12 @@ const searchDebounceMs = cfg.searchDebounceMs ?? 120
           })
         } catch { return iso }
       }
+      // CSS view-transition-name must be a valid CSS ident. Slugs are usually
+      // safe (lowercase hyphens) but defend by prefixing + replacing anything
+      // outside [a-zA-Z0-9-_].
+      function transitionName(slug) {
+        return "post-" + String(slug).replace(/[^a-zA-Z0-9_-]/g, "_")
+      }
       function cardHTML(p) {
         const href = `${basePath}/${p.id}/`
         const image = p.featuredImage || fallbackImage
@@ -299,7 +357,7 @@ const searchDebounceMs = cfg.searchDebounceMs ?? 120
         const dateLabel = formatDate(p.publishDate)
         const categoryLine = p.category ? ` &middot; ${escapeHtml(p.category)}` : ""
         return `
-          <article class="group flex h-full flex-col overflow-hidden rounded-card border border-border bg-bg-elevated shadow-card transition-colors hover:border-accent/60">
+          <article style="view-transition-name: ${transitionName(p.id)}" class="group flex h-full flex-col overflow-hidden rounded-card border border-border bg-bg-elevated shadow-card transition-colors hover:border-accent/60">
             <a href="${escapeAttr(href)}" class="flex h-full flex-col">
               ${imageBlock}
               <div class="flex flex-1 flex-col p-5">
@@ -355,37 +413,47 @@ const searchDebounceMs = cfg.searchDebounceMs ?? 120
       }
 
       // ----- Re-render -----
+      // Wraps the DOM update in View Transitions API when available so the
+      // browser cross-fades + FLIPs cards into new positions natively.
+      // Falls back to instant swap when the API isn't supported (Firefox at
+      // time of writing) or when the user prefers reduced motion.
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      function runUpdate(update) {
+        if (document.startViewTransition && !prefersReducedMotion) {
+          document.startViewTransition(update)
+        } else {
+          update()
+        }
+      }
       function render() {
         const filtersActive = activeFilterCount() > 0
-        if (filtersActive) {
-          // JS takes over: hide load-more + pagination (filtering is client-only now)
-          if (loadMoreBtn) loadMoreBtn.style.display = "none"
-          if (paginationEl) paginationEl.style.display = "none"
-          const matched = applyFilters()
-          if (matched.length === 0) {
-            grid.innerHTML = noResultsHTML()
-          } else {
-            grid.innerHTML = matched.map(cardHTML).join("")
-          }
-        } else {
-          // No filters — render full set newest-first (or oldest depending on sort).
-          // With sort=newest this matches the static SSR'd grid; with sort=oldest
-          // we still need JS to re-render in reverse order.
-          if (state.sort === "oldest") {
-            const all = applyFilters()
-            grid.innerHTML = all.map(cardHTML).join("")
+        runUpdate(() => {
+          if (filtersActive) {
+            // JS takes over: hide load-more + pagination (filtering is client-only now)
             if (loadMoreBtn) loadMoreBtn.style.display = "none"
             if (paginationEl) paginationEl.style.display = "none"
+            const matched = applyFilters()
+            if (matched.length === 0) {
+              grid.innerHTML = noResultsHTML()
+            } else {
+              grid.innerHTML = matched.map(cardHTML).join("")
+            }
           } else {
-            // Restore the static SSR cards by reloading their HTML via the manifest.
-            // (Faster than refetching the page.)
+            // No filters — render full set newest-first (or oldest depending on sort).
+            // With sort=newest this matches the static SSR'd grid; with sort=oldest
+            // we still need JS to re-render in reverse order.
             const all = applyFilters()
             grid.innerHTML = all.map(cardHTML).join("")
-            if (loadMoreBtn) loadMoreBtn.style.display = ""
-            if (paginationEl) paginationEl.style.display = ""
+            if (state.sort === "oldest") {
+              if (loadMoreBtn) loadMoreBtn.style.display = "none"
+              if (paginationEl) paginationEl.style.display = "none"
+            } else {
+              if (loadMoreBtn) loadMoreBtn.style.display = ""
+              if (paginationEl) paginationEl.style.display = ""
+            }
           }
-        }
-        // Show / hide clear button + active count badge.
+        })
+        // Non-grid UI updates happen synchronously — they don't need transitions.
         const count = activeFilterCount()
         if (clearBtn) clearBtn.classList.toggle("hidden", count === 0)
         if (activeCountEl) {
@@ -472,6 +540,22 @@ const searchDebounceMs = cfg.searchDebounceMs ?? 120
           render()
         }
       })
+
+      // Tag SSR'd cards with view-transition-name so the FIRST filter action
+      // runs through View Transitions as a named FLIP (matching the JS-rendered
+      // cards on subsequent re-renders). Without this the first transition is
+      // a generic cross-fade, then subsequent ones FLIP — inconsistent feel.
+      function tagSsrCards() {
+        Array.from(grid.children).forEach((el) => {
+          if (!(el instanceof HTMLElement)) return
+          const link = el.querySelector("a[href]")
+          if (!link) return
+          const href = link.getAttribute("href") || ""
+          const m = href.match(/\/([^/]+)\/?$/)
+          if (m) el.style.viewTransitionName = transitionName(m[1])
+        })
+      }
+      tagSsrCards()
 
       // Initial paint — restore from URL.
       readUrlState()
