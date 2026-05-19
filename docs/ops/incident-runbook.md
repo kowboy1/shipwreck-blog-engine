@@ -56,7 +56,7 @@ A post's frontmatter doesn't match the Zod schema. This happens when:
 - Fix the post's frontmatter
 - Re-run build
 
-### "Cannot find module '@shipwreck/blog-core'"
+### "Cannot find module '@nitroblog/core'"
 
 Engine package isn't installed. Either:
 - `node_modules/` is gone — run `npm ci` or `npm install`
@@ -172,7 +172,7 @@ If a post is missing in production but exists in source: confirm the build was r
 ### Editor opens but fields look wrong
 
 - `config.yml` field definitions are out of sync with the Zod schema
-- Compare `_blog/public/admin/config.yml` `collections.posts.fields` against `packages/blog-core/src/schemas/post.ts`
+- Compare `_blog/public/admin/config.yml` `collections.posts.fields` against `packages/core/src/schemas/post.ts`
 - Update the YAML to match
 
 ## When you're stuck

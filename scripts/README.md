@@ -21,7 +21,7 @@ node scripts/extract-theme.mjs https://<host-domain> > tokens.draft.css
 
 Heuristics are best-effort — every value should be reviewed before use. The output marks unreliable tokens with `/* TODO: confirm ... */` comments.
 
-See [TOKEN-CONTRACT.md](../packages/blog-theme-default/TOKEN-CONTRACT.md) for the full token list.
+See [TOKEN-CONTRACT.md](../packages/theme-default/TOKEN-CONTRACT.md) for the full token list.
 
 ### `visual-diff.mjs`
 

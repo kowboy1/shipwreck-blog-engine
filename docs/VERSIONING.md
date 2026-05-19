@@ -39,9 +39,9 @@ The engine is a monorepo. Versions are kept in lockstep — every workspace pack
 **Files updated on every bump:**
 
 1. `package.json` (root)
-2. `packages/blog-core/package.json`
-3. `packages/blog-theme-default/package.json`
-4. `packages/create-shipwreck-blog/package.json`
+2. `packages/core/package.json`
+3. `packages/theme-default/package.json`
+4. `packages/create-nitroblog/package.json`
 5. `examples/demo-site/package.json`
 6. `CHANGELOG.md` — move `[Unreleased]` entries to `[X.Y.Z] - YYYY-MM-DD`
 7. Any `docs/` page that describes the changed behaviour
@@ -165,7 +165,7 @@ Tags let downstream sites pin via git+ssh:
 
 ```json
 {
-  "@shipwreck/blog-core": "git+ssh://git@github.com:YOUR_ORG/shipwreck-blog-engine.git#v0.1.1&workspace=@shipwreck/blog-core"
+  "@nitroblog/core": "git+ssh://git@github.com:YOUR_ORG/nitroblog-ai.git#v0.1.1&workspace=@nitroblog/core"
 }
 ```
 

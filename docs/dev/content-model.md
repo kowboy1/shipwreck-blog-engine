@@ -1,6 +1,6 @@
 # Content model
 
-The Zod schemas in `packages/blog-core/src/schemas/` define the contract between the engine and consuming sites. This doc explains *why* each piece exists. For field-by-field reference, see [reference/post-frontmatter.md](../reference/post-frontmatter.md) and [reference/site-config.md](../reference/site-config.md).
+The Zod schemas in `packages/core/src/schemas/` define the contract between the engine and consuming sites. This doc explains *why* each piece exists. For field-by-field reference, see [reference/post-frontmatter.md](../reference/post-frontmatter.md) and [reference/site-config.md](../reference/site-config.md).
 
 ## Three top-level schemas
 
@@ -11,7 +11,7 @@ The Zod schemas in `packages/blog-core/src/schemas/` define the contract between
 | `siteConfigSchema` | Per-site brand/SEO/layout config | `site.config.ts` (one file, exports default) |
 | `redirectsSchema` | Static redirect rules | `src/redirects.json` (one file, array) |
 
-All four are exported from `@shipwreck/blog-core`.
+All four are exported from `@nitroblog/core`.
 
 ## postSchema
 
@@ -152,7 +152,7 @@ For consumers: if you've shadowed a component locally, schema changes might affe
 
 ## Adding a schema field
 
-1. Edit the relevant Zod schema (`packages/blog-core/src/schemas/<schema>.ts`)
+1. Edit the relevant Zod schema (`packages/core/src/schemas/<schema>.ts`)
 2. Make it optional unless absolutely required
 3. Update `examples/demo-site/` to use the new field somewhere
 4. Update Sveltia config in `examples/demo-site/public/admin/config.yml` to mirror the new field

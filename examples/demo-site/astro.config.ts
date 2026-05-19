@@ -2,7 +2,7 @@ import { defineConfig } from "astro/config"
 import mdx from "@astrojs/mdx"
 import sitemap from "@astrojs/sitemap"
 import tailwind from "@astrojs/tailwind"
-import shipwreckBlog from "@shipwreck/blog-core/integration"
+import nitroblog from "@nitroblog/core/integration"
 import siteConfig from "./site.config"
 import { remarkReadingTime } from "./src/lib/remark-reading-time.mjs"
 
@@ -17,7 +17,7 @@ export default defineConfig({
   // "No cached compile metadata found".
   vite: { resolve: { preserveSymlinks: true } },
   integrations: [
-    shipwreckBlog({ extraRemarkPlugins: [remarkReadingTime] }),
+    nitroblog({ extraRemarkPlugins: [remarkReadingTime] }),
     mdx(),
     sitemap(),
     tailwind({ applyBaseStyles: false }),

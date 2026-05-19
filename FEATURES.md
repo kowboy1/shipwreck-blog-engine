@@ -1,4 +1,4 @@
-# Shipwreck Blog Engine — Feature List
+# NitroBlog AI — Feature List
 
 > ⚠️ **STOP** — if you are an agent and haven't read [AGENTS.md](AGENTS.md) yet, read that first.
 > This is a reference catalogue, not a runbook. Continue here only when you need to look up what's supported / where it lives.
@@ -7,7 +7,7 @@
 
 The canonical, exhaustive list of what the engine ships out of the box. Each item links to its source so an agent can find the implementation in one hop. Items are grouped by concern, not by release.
 
-For per-release detail, see [CHANGELOG.md](CHANGELOG.md). For a plain-English overview, see [HOW-IT-WORKS.md](HOW-IT-WORKS.md). For the agent runbook on integrating into a new site, see [AGENTS.md](AGENTS.md) and [.claude/skills/integrate-shipwreck-blog.md](.claude/skills/integrate-shipwreck-blog.md).
+For per-release detail, see [CHANGELOG.md](CHANGELOG.md). For a plain-English overview, see [HOW-IT-WORKS.md](HOW-IT-WORKS.md). For the agent runbook on integrating into a new site, see [AGENTS.md](AGENTS.md) and [.claude/skills/integrate-nitroblog.md](.claude/skills/integrate-nitroblog.md).
 
 ---
 
@@ -26,7 +26,7 @@ For per-release detail, see [CHANGELOG.md](CHANGELOG.md). For a plain-English ov
 11. [Integration + ops](#11-integration--ops)
 12. [Doctor / validation gates](#12-doctor--validation-gates)
 13. [Configuration knobs (siteConfig)](#13-configuration-knobs-siteconfig)
-14. [Public exports](#14-public-exports-shipwreckblog-core)
+14. [Public exports](#14-public-exports-nitroblog-core)
 
 ---
 
@@ -34,7 +34,7 @@ For per-release detail, see [CHANGELOG.md](CHANGELOG.md). For a plain-English ov
 
 Zod-validated frontmatter at build time — invalid posts fail the build with a clear error.
 
-**Post fields** ([packages/blog-core/src/schemas/post.ts](packages/blog-core/src/schemas/post.ts))
+**Post fields** ([packages/core/src/schemas/post.ts](packages/core/src/schemas/post.ts))
 
 | Field | Required | Notes |
 |---|---|---|
@@ -66,7 +66,7 @@ Zod-validated frontmatter at build time — invalid posts fail the build with a 
 | `copyrightHolder` | optional | defaults to siteConfig brand |
 | `isAccessibleForFree` | default true | paywall signal for AI crawlers |
 
-**Author fields** ([packages/blog-core/src/schemas/author.ts](packages/blog-core/src/schemas/author.ts))
+**Author fields** ([packages/core/src/schemas/author.ts](packages/core/src/schemas/author.ts))
 
 | Field | Notes |
 |---|---|
@@ -81,9 +81,9 @@ Zod-validated frontmatter at build time — invalid posts fail the build with a 
 | `alumniOf` | nested `EducationalOrganization` |
 | `contributorSince` | ISO date, Experience signal |
 
-Helper: [`buildPersonSchema(author)`](packages/blog-core/src/schemas/author.ts) produces a full Schema.org `Person` from any author record.
+Helper: [`buildPersonSchema(author)`](packages/core/src/schemas/author.ts) produces a full Schema.org `Person` from any author record.
 
-**Site config** ([packages/blog-core/src/schemas/site-config.ts](packages/blog-core/src/schemas/site-config.ts)) — full list in §13.
+**Site config** ([packages/core/src/schemas/site-config.ts](packages/core/src/schemas/site-config.ts)) — full list in §13.
 
 ---
 
@@ -93,8 +93,8 @@ The engine ships **page renderers** (Astro components) that consumer sites use a
 
 | Renderer | Used by | Path |
 |---|---|---|
-| `PostPage.astro` | `[...slug].astro` per-site | [packages/blog-core/src/pages/PostPage.astro](packages/blog-core/src/pages/PostPage.astro) |
-| `ListingPage.astro` | index, paginated, tag, category, author archives | [packages/blog-core/src/pages/ListingPage.astro](packages/blog-core/src/pages/ListingPage.astro) |
+| `PostPage.astro` | `[...slug].astro` per-site | [packages/core/src/pages/PostPage.astro](packages/core/src/pages/PostPage.astro) |
+| `ListingPage.astro` | index, paginated, tag, category, author archives | [packages/core/src/pages/ListingPage.astro](packages/core/src/pages/ListingPage.astro) |
 
 **Data prep helpers** (async builders consumed by the page renderers):
 
@@ -104,13 +104,13 @@ The engine ships **page renderers** (Astro components) that consumer sites use a
 | `prepareIndexPage()` | un-paginated `/blog/`, includes filter manifest + facets |
 | `prepareTagPage()` / `prepareCategoryPage()` / `prepareAuthorPage()` | archive variants |
 
-**Article layout** ([packages/blog-core/src/components/ArticleLayout.astro](packages/blog-core/src/components/ArticleLayout.astro)) — three-column responsive grid `[ToC] [main] [aside]` with graceful collapse when any slot is empty.
+**Article layout** ([packages/core/src/components/ArticleLayout.astro](packages/core/src/components/ArticleLayout.astro)) — three-column responsive grid `[ToC] [main] [aside]` with graceful collapse when any slot is empty.
 
 ---
 
 ## 3. Rendering components
 
-All under [packages/blog-core/src/components/](packages/blog-core/src/components/).
+All under [packages/core/src/components/](packages/core/src/components/).
 
 | Component | Purpose |
 |---|---|
@@ -119,7 +119,7 @@ All under [packages/blog-core/src/components/](packages/blog-core/src/components
 | `Breadcrumbs` | Visible breadcrumb trail (matches the JSON-LD `BreadcrumbList`). |
 | `TableOfContents` | Sticky desktop / collapsible mobile ToC built from H2/H3 in the body. |
 | `RelatedPosts` | "More articles" grid on post pages. Renders via `<PostCard>` (no duplicate card markup). Accepts `fallbackImage` to match listing card visuals. |
-| `PopularPosts` | Sticky right-column mini-card list on post pages. Powered by `.shipwreck/popularity.json` with recency fallback. |
+| `PopularPosts` | Sticky right-column mini-card list on post pages. Powered by `.nitroblog/popularity.json` with recency fallback. |
 | `FeaturedPosts` | Older list-style sidebar widget. |
 | `BlogFilters` | Live search + sort + tag/category chips + featured-only toggle on `/blog/`. Pure progressive enhancement. |
 | `CTABlock` | Per-site CTA registry — sticky right-column on post pages. |
@@ -132,7 +132,7 @@ All under [packages/blog-core/src/components/](packages/blog-core/src/components
 
 ## 4. Technical SEO
 
-**Meta tags** ([packages/blog-core/src/seo/meta.ts](packages/blog-core/src/seo/meta.ts)) — every blog page emits:
+**Meta tags** ([packages/core/src/seo/meta.ts](packages/core/src/seo/meta.ts)) — every blog page emits:
 
 - `<title>`, `<meta name="description">`, `<link rel="canonical">`, `<meta name="robots">`
 - OG: `type`, `title`, `description`, `image`, `image:width`, `image:height`, `image:alt`, `url`, `site_name`, `locale`
@@ -148,10 +148,10 @@ All under [packages/blog-core/src/components/](packages/blog-core/src/components
 | File | Generated by | Notes |
 |---|---|---|
 | `/blog/sitemap-index.xml` + `/blog/sitemap-0.xml` | `@astrojs/sitemap` | All static blog routes |
-| `/blog/image-sitemap.xml` | [`buildImageSitemap()`](packages/blog-core/src/api/image-sitemap.ts) | Per-post `<image:image>` entries with title + caption |
+| `/blog/image-sitemap.xml` | [`buildImageSitemap()`](packages/core/src/api/image-sitemap.ts) | Per-post `<image:image>` entries with title + caption |
 | `/blog/rss.xml` | per-site `rss.xml.ts` | Standard Atom-via-RSS |
 | `/blog/robots.txt` | per-site `robots.txt.ts` | References both sitemaps |
-| `/blog/posts.json` | [`buildPostsManifest()`](packages/blog-core/src/api/posts-manifest.ts) | Public machine-readable manifest of every published post |
+| `/blog/posts.json` | [`buildPostsManifest()`](packages/core/src/api/posts-manifest.ts) | Public machine-readable manifest of every published post |
 
 **URL hygiene**
 
@@ -175,7 +175,7 @@ All emitted as `<script type="application/ld+json">` blocks in `<head>` via the 
 
 | Schema | Where | Builder |
 |---|---|---|
-| `BlogPosting` / `Article` / `NewsArticle` / `TechArticle` | every post | [`articleSchema()`](packages/blog-core/src/seo/schema-org.ts) |
+| `BlogPosting` / `Article` / `NewsArticle` / `TechArticle` | every post | [`articleSchema()`](packages/core/src/seo/schema-org.ts) |
 | `BreadcrumbList` | every blog page | `breadcrumbSchema()` |
 | `Organization` | listing pages (toggleable via `seo.emitOrganizationSchema`) | `organizationSchema()` |
 | `WebSite` | listing pages, off by default (opt-in via `seo.emitWebsiteSchema` for standalone deployments) | `websiteSchema()` |
@@ -215,6 +215,34 @@ Fields that signal to AI answer engines (ChatGPT search, Perplexity, Claude sear
 | `faqItems[]` | `FAQPage` | Most cited schema by AI answer engines |
 | Author `knowsAbout[]` + `sameAs[]` | `Person.knowsAbout` + `Person.sameAs` | E-E-A-T author authority |
 
+### 6.1 GEO field contract (cross-engine alignment with NitroCore AI)
+
+NitroBlog AI emits these fields on `/blog/*` pages (in `Article` / `BlogPosting` JSON-LD). NitroCore AI emits the same fields on every non-blog page (in `WebPage` / `Service` / `Product` / `LocalBusiness` JSON-LD via its `<SEO>` and `*Schema` components). The two engines must produce **identical JSON-LD shapes** for these shared primitives so a Schema.org consumer (Google, Anthropic, OpenAI, Perplexity, etc.) sees a coherent site-wide signal.
+
+This is the canonical contract. When Schema.org changes a GEO-relevant field, **update this section first**, then implement in both engines in lockstep.
+
+| Field | Type | JSON-LD shape | Default |
+|---|---|---|---|
+| `abstract` | `string` | `"abstract": "<verbatim>"` | omitted when unset |
+| `about` | `string[]` | `"about": [{ "@type": "Thing", "name": "<item>" }, ...]` | omitted when empty |
+| `mentions` | `string[]` | `"mentions": [{ "@type": "Thing", "name": "<item>" }, ...]` | omitted when empty |
+| `license` | `string` (URL) | `"license": "<url>"` | omitted when unset |
+| `isAccessibleForFree` | `boolean` | `"isAccessibleForFree": true \| false` | `true` (always emitted) |
+
+**Where this is implemented in NitroBlog AI:**
+
+- Frontmatter schema: [packages/core/src/schemas/post.ts](packages/core/src/schemas/post.ts)
+- Builder: `articleSchema()` in [packages/core/src/seo/schema-org.ts](packages/core/src/seo/schema-org.ts)
+
+**Where this is implemented in NitroCore AI:**
+
+- Props surface: `<SEO>`, `<ProductSchema>`, `<ServiceSchema>`, `<LocalBusiness>` (see NitroCore STANDARDS.md §8.3)
+- Builder: inline JSON-LD construction in each `*Schema.astro` component
+
+**Drift rule:** if you're adding a new GEO field to one engine, you must update this table and ship the matching change in the other engine within the same release pair. If the contract is updated without the matching code change, the next NitroCore audit run (`npm run audit` in a NitroCore + blog site) will flag the inconsistency.
+
+**Why not a shared package?** The drift surface is small (5 fields) and the partition (NitroCore owns site-wide schemas, NitroBlog AI owns `/blog/*`) prevents same-page overlap. A documented contract is lighter than a third package and accomplishes the anti-drift goal. If a third consumer of these builders ever appears, that's the right moment to extract `@nitroblog/schema`.
+
 ---
 
 ## 7. Performance + Core Web Vitals
@@ -223,7 +251,7 @@ Fields that signal to AI answer engines (ChatGPT search, Perplexity, Claude sear
 
 - Hero `<img>` carries explicit `width` + `height` (auto-probed from disk), `fetchpriority="high"`, `decoding="async"`
 - `<link rel="preload" as="image" fetchpriority="high">` for hero emitted in `<head>`
-- Inline-stylesheets enabled by default (`shipwreckBlog({ inlineStylesheets: "auto" })` — Astro inlines small CSS chunks)
+- Inline-stylesheets enabled by default (`nitroblog({ inlineStylesheets: "auto" })` — Astro inlines small CSS chunks)
 
 **CLS**
 
@@ -252,8 +280,8 @@ Fields that signal to AI answer engines (ChatGPT search, Perplexity, Claude sear
 
 ## 8. Accessibility
 
-- Skip-to-content link emitted as first focusable element on every blog page (`href="#shipwreck-main"`)
-- `<main id="shipwreck-main">` wrapper on PostPage + ListingPage
+- Skip-to-content link emitted as first focusable element on every blog page (`href="#nitroblog-main"`)
+- `<main id="nitroblog-main">` wrapper on PostPage + ListingPage
 - ARIA: `role="radiogroup"` on filter sort, `aria-pressed` on chips, `aria-controls`/`aria-expanded` on tag see-more toggle, `aria-live="polite"` on filter count badge
 - Focus rings: stable visible focus outline on every filter control, links use `:focus-visible` browser default
 - `prefers-reduced-motion` honoured: view transitions, FLIP animation, see-more slide all disable
@@ -270,7 +298,7 @@ Fields that signal to AI answer engines (ChatGPT search, Perplexity, Claude sear
 - Hover state: accent border, title goes accent-blue, hero zoom (`group-hover:scale-[1.02]`)
 - Fallback image when post lacks `featuredImage` (configurable via `siteConfig.cards.fallbackImage`)
 
-**Live filter sidebar** ([`BlogFilters.astro`](packages/blog-core/src/components/BlogFilters.astro))
+**Live filter sidebar** ([`BlogFilters.astro`](packages/core/src/components/BlogFilters.astro))
 
 - Search input — debounced, fires after `minSearchChars` (default 3), searches title + excerpt + category + tags + author
 - Sort toggle — Newest / Oldest (`aria-pressed` chip pair)
@@ -283,7 +311,7 @@ Fields that signal to AI answer engines (ChatGPT search, Perplexity, Claude sear
 
 **No-reload mechanics**
 
-- Inline `<script id="shipwreck-posts-manifest" type="application/json">` — no extra fetch
+- Inline `<script id="nitroblog-posts-manifest" type="application/json">` — no extra fetch
 - URL state synced via `history.replaceState` — sharable filtered views, refresh-safe
 - View Transitions API on grid swap — native FLIP cross-fade per card (`view-transition-name: post-<slug>`)
 - `prefers-reduced-motion` disables transitions
@@ -305,37 +333,37 @@ Fields that signal to AI answer engines (ChatGPT search, Perplexity, Claude sear
 
 **MDX content support** — full Markdown + embedded components via `@astrojs/mdx`.
 
-**Remark plugins** (auto-wired via `shipwreckBlog()` integration):
+**Remark plugins** (auto-wired via `nitroblog()` integration):
 
-- `remarkStripDuplicateH1` — strips body H1s that fuzzy-match the title; downgrades unrelated body H1s to H2; emits build-log warnings ([packages/blog-core/src/remark/strip-duplicate-h1.mjs](packages/blog-core/src/remark/strip-duplicate-h1.mjs))
-- Consumer can append more plugins via `shipwreckBlog({ extraRemarkPlugins: [...] })`
+- `remarkStripDuplicateH1` — strips body H1s that fuzzy-match the title; downgrades unrelated body H1s to H2; emits build-log warnings ([packages/core/src/remark/strip-duplicate-h1.mjs](packages/core/src/remark/strip-duplicate-h1.mjs))
+- Consumer can append more plugins via `nitroblog({ extraRemarkPlugins: [...] })`
 
-**Seed content** — `npx shipwreck-blog-doctor seed-posts` writes 3 site-themed placeholder posts (Welcome / Three things / Getting started) with FAQ items + a bundled seed-hero SVG. Each post explicitly self-identifies as seed content so real visitors aren't confused.
+**Seed content** — `npx nitroblog-doctor seed-posts` writes 3 site-themed placeholder posts (Welcome / Three things / Getting started) with FAQ items + a bundled seed-hero SVG. Each post explicitly self-identifies as seed content so real visitors aren't confused.
 
-**Agent skill for adding posts** — [.claude/skills/add-shipwreck-blog-post.md](.claude/skills/add-shipwreck-blog-post.md) walks any agent (NyXi, Claude, etc.) through the full add-post flow including the mandatory hero-image generation in Phase 7.5.
+**Agent skill for adding posts** — [.claude/skills/add-nitroblog-post.md](.claude/skills/add-nitroblog-post.md) walks any agent (NyXi, Claude, etc.) through the full add-post flow including the mandatory hero-image generation in Phase 7.5.
 
 ---
 
 ## 11. Integration + ops
 
-**Astro integration** ([packages/blog-core/src/integration.ts](packages/blog-core/src/integration.ts))
+**Astro integration** ([packages/core/src/integration.ts](packages/core/src/integration.ts))
 
 ```ts
-import shipwreckBlog from "@shipwreck/blog-core/integration"
-integrations: [shipwreckBlog()]
+import nitroblog from "@nitroblog/core/integration"
+integrations: [nitroblog()]
 ```
 
 Auto-registers the engine's remark plugins + sets `build.inlineStylesheets` (default `"auto"`).
 
-**Site registry** — [.shipwreck/sites.json](.shipwreck/sites.json) tracks every site running the engine. Entries include name, domain, engine version, deploy mechanism, owner.
+**Site registry** — [.nitroblog/sites.json](.nitroblog/sites.json) tracks every site running the engine. Entries include name, domain, engine version, deploy mechanism, owner.
 
-**Per-site metadata** — `.shipwreck-site.json` at the site repo root (engine version, last deployed, etc.).
+**Per-site metadata** — `.nitroblog-site.json` at the site repo root (engine version, last deployed, etc.).
 
-**Per-site analytics data** — `.shipwreck/popularity.json` (rolling 30-day pageviews) drives the Popular articles widget. Reference Cloudflare Web Analytics producer at [scripts/refresh-popularity.mjs](scripts/refresh-popularity.mjs).
+**Per-site analytics data** — `.nitroblog/popularity.json` (rolling 30-day pageviews) drives the Popular articles widget. Reference Cloudflare Web Analytics producer at [scripts/refresh-popularity.mjs](scripts/refresh-popularity.mjs).
 
-**Per-site art direction** — `.shipwreck/art-direction.json` (style, palette, aspect ratio, subject hint, avoid list) drives the hero-image generation flow in the add-post skill. Schema at [packages/blog-core/src/schemas/art-direction.ts](packages/blog-core/src/schemas/art-direction.ts).
+**Per-site art direction** — `.nitroblog/art-direction.json` (style, palette, aspect ratio, subject hint, avoid list) drives the hero-image generation flow in the add-post skill. Schema at [packages/core/src/schemas/art-direction.ts](packages/core/src/schemas/art-direction.ts).
 
-**Update path** — `npm update @shipwreck/blog-core @shipwreck/blog-theme-default` in any consumer site picks up the latest engine. No per-site code changes for additive releases.
+**Update path** — `npm update @nitroblog/core @nitroblog/theme-default` in any consumer site picks up the latest engine. No per-site code changes for additive releases.
 
 **Deploy** — engine doesn't own deploy. Static `dist/` from `npm run build` is what ends up on the host. Use whatever the host already does (Cloudflare Pages, rsync, SFTP, manual upload). [ROLLOUT.md](ROLLOUT.md) covers patterns.
 
@@ -343,7 +371,7 @@ Auto-registers the engine's remark plugins + sets `build.inlineStylesheets` (def
 
 ## 12. Doctor / validation gates
 
-`npx shipwreck-blog-doctor` ([packages/blog-core/bin/doctor.mjs](packages/blog-core/bin/doctor.mjs)) — preflight + post-install + closeout gate.
+`npx nitroblog-doctor` ([packages/core/bin/doctor.mjs](packages/core/bin/doctor.mjs)) — preflight + post-install + closeout gate.
 
 **Modes**
 
@@ -393,7 +421,7 @@ Auto-registers the engine's remark plugins + sets `build.inlineStylesheets` (def
 
 ## 13. Configuration knobs (`siteConfig`)
 
-Top-level `siteConfig` in per-site `site.config.ts`. Full Zod schema at [packages/blog-core/src/schemas/site-config.ts](packages/blog-core/src/schemas/site-config.ts).
+Top-level `siteConfig` in per-site `site.config.ts`. Full Zod schema at [packages/core/src/schemas/site-config.ts](packages/core/src/schemas/site-config.ts).
 
 ```ts
 {
@@ -481,33 +509,33 @@ Top-level `siteConfig` in per-site `site.config.ts`. Full Zod schema at [package
 
 ---
 
-## 14. Public exports (`@shipwreck/blog-core`)
+## 14. Public exports (`@nitroblog/core`)
 
 ```ts
 // Page renderers
-import PostPage from "@shipwreck/blog-core/pages/PostPage.astro"
-import ListingPage from "@shipwreck/blog-core/pages/ListingPage.astro"
+import PostPage from "@nitroblog/core/pages/PostPage.astro"
+import ListingPage from "@nitroblog/core/pages/ListingPage.astro"
 import {
   preparePostPageData,
   prepareIndexPage,
   prepareTagPage,
   prepareCategoryPage,
   prepareAuthorPage,
-} from "@shipwreck/blog-core"
+} from "@nitroblog/core"
 
 // Components
-import PostCard from "@shipwreck/blog-core/components/PostCard.astro"
-import ResponsivePicture from "@shipwreck/blog-core/components/ResponsivePicture.astro"
-import BlogFilters from "@shipwreck/blog-core/components/BlogFilters.astro"
-import PopularPosts from "@shipwreck/blog-core/components/PopularPosts.astro"
-import RelatedPosts from "@shipwreck/blog-core/components/RelatedPosts.astro"
-import AuthorBio from "@shipwreck/blog-core/components/AuthorBio.astro"
-import AuthorAvatar from "@shipwreck/blog-core/components/AuthorAvatar.astro"
-import Breadcrumbs from "@shipwreck/blog-core/components/Breadcrumbs.astro"
-import TableOfContents from "@shipwreck/blog-core/components/TableOfContents.astro"
-import TagList from "@shipwreck/blog-core/components/TagList.astro"
-import Pagination from "@shipwreck/blog-core/components/Pagination.astro"
-import CTABlock from "@shipwreck/blog-core/components/CTABlock.astro"
+import PostCard from "@nitroblog/core/components/PostCard.astro"
+import ResponsivePicture from "@nitroblog/core/components/ResponsivePicture.astro"
+import BlogFilters from "@nitroblog/core/components/BlogFilters.astro"
+import PopularPosts from "@nitroblog/core/components/PopularPosts.astro"
+import RelatedPosts from "@nitroblog/core/components/RelatedPosts.astro"
+import AuthorBio from "@nitroblog/core/components/AuthorBio.astro"
+import AuthorAvatar from "@nitroblog/core/components/AuthorAvatar.astro"
+import Breadcrumbs from "@nitroblog/core/components/Breadcrumbs.astro"
+import TableOfContents from "@nitroblog/core/components/TableOfContents.astro"
+import TagList from "@nitroblog/core/components/TagList.astro"
+import Pagination from "@nitroblog/core/components/Pagination.astro"
+import CTABlock from "@nitroblog/core/components/CTABlock.astro"
 
 // SEO builders
 import {
@@ -523,7 +551,7 @@ import {
   type MetaTags,
   type MetaLink,
   type ArticleAuthor,
-} from "@shipwreck/blog-core"
+} from "@nitroblog/core"
 
 // Schemas (Zod)
 import {
@@ -539,7 +567,7 @@ import {
   type SiteConfig,
   type ArtDirection,
   type Popularity,
-} from "@shipwreck/blog-core"
+} from "@nitroblog/core"
 
 // API helpers
 import {
@@ -549,7 +577,7 @@ import {
   type PostsManifest,
   type PostManifestEntry,
   type FilterFacets,
-} from "@shipwreck/blog-core"
+} from "@nitroblog/core"
 
 // Utils
 import {
@@ -561,13 +589,13 @@ import {
   loadPopularityFile,
   selectPopularPosts,
   probeFeaturedImageSize,
-} from "@shipwreck/blog-core/utils"
+} from "@nitroblog/core/utils"
 
 // Astro integration
-import shipwreckBlog from "@shipwreck/blog-core/integration"
+import nitroblog from "@nitroblog/core/integration"
 
 // Remark plugin
-import { remarkStripDuplicateH1 } from "@shipwreck/blog-core/remark/strip-duplicate-h1"
+import { remarkStripDuplicateH1 } from "@nitroblog/core/remark/strip-duplicate-h1"
 ```
 
 ---
@@ -590,6 +618,6 @@ For pointers / future references:
 - [HOW-IT-WORKS.md](HOW-IT-WORKS.md) — human-language explainer (no API surface)
 - [ARCHITECTURE.md](ARCHITECTURE.md) — package layout + design decisions
 - [AGENTS.md](AGENTS.md) — agent runbook entrypoint
-- [.claude/skills/integrate-shipwreck-blog.md](.claude/skills/integrate-shipwreck-blog.md) — install runbook
-- [.claude/skills/add-shipwreck-blog-post.md](.claude/skills/add-shipwreck-blog-post.md) — add-post runbook
+- [.claude/skills/integrate-nitroblog.md](.claude/skills/integrate-nitroblog.md) — install runbook
+- [.claude/skills/add-nitroblog-post.md](.claude/skills/add-nitroblog-post.md) — add-post runbook
 - [CHANGELOG.md](CHANGELOG.md) — version history with per-release migration notes

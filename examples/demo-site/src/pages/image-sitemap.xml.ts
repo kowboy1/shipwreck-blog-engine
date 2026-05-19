@@ -1,5 +1,5 @@
 import { getCollection } from "astro:content"
-import { buildImageSitemap } from "@shipwreck/blog-core"
+import { buildImageSitemap } from "@nitroblog/core"
 import siteConfig from "../../site.config"
 import type { APIContext } from "astro"
 

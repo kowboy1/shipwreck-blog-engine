@@ -1,4 +1,4 @@
-# Shipwreck Blog Engine — Documentation
+# NitroBlog AI — Documentation
 
 This directory is the single source of truth for how the engine is built and operated. Every commit that changes behaviour also updates the relevant doc here. See [VERSIONING.md](./VERSIONING.md) for the discipline.
 

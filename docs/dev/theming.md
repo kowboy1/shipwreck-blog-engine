@@ -6,7 +6,7 @@ The engine's theming model is intentionally minimal: CSS custom properties for t
 
 ### Layer 1 — Design tokens (CSS custom properties)
 
-Defined in `@shipwreck/blog-theme-default/tokens.css`:
+Defined in `@nitroblog/theme-default/tokens.css`:
 
 ```css
 :root {
@@ -28,7 +28,7 @@ The engine's Tailwind preset references these via `var(--color-bg)` etc., so Tai
 
 ### Layer 2 — SiteShell components
 
-Per-site `Header.astro` and `Footer.astro` in `_blog/src/components/SiteShell/`. Engine doesn't ship default ones (well, the demo site does, but they're not exported from blog-core).
+Per-site `Header.astro` and `Footer.astro` in `_blog/src/components/SiteShell/`. Engine doesn't ship default ones (well, the demo site does, but they're not exported from core).
 
 This split is important: tokens cover *colors and fonts*. SiteShell covers *markup and layout*. Most theming happens in tokens; the harder work happens in SiteShell when porting a host site's chrome.
 
@@ -37,7 +37,7 @@ This split is important: tokens cover *colors and fonts*. SiteShell covers *mark
 In `_blog/src/styles/global.css`:
 
 ```css
-@import "@shipwreck/blog-theme-default/tokens.css";
+@import "@nitroblog/theme-default/tokens.css";
 
 @tailwind base;
 @tailwind components;
@@ -112,7 +112,7 @@ Run `npm run dev`, open the host site and the blog `/blog/` side by side. Compar
 
 ## How the Tailwind preset works
 
-`packages/blog-theme-default/tailwind-preset.js`:
+`packages/theme-default/tailwind-preset.js`:
 
 ```js
 export default {
@@ -188,7 +188,7 @@ Bunny Fonts / OS-provided: just set `--font-sans` to the family name, no loader 
 
 If a site has shadowed a component (e.g. its own `_blog/src/components/PostCard.astro`), it can use ANY styling approach — Tailwind, scoped CSS, inline styles. The engine doesn't dictate.
 
-But: if you find yourself shadowing 3+ components for theming reasons, you've drifted from the intended model. Reconsider whether your tokens are right, or whether the change should land in `blog-core`.
+But: if you find yourself shadowing 3+ components for theming reasons, you've drifted from the intended model. Reconsider whether your tokens are right, or whether the change should land in `core`.
 
 ## What the engine does NOT do
 
@@ -200,10 +200,10 @@ But: if you find yourself shadowing 3+ components for theming reasons, you've dr
 
 ## Future themes
 
-We could ship `@shipwreck/blog-theme-magazine`, `@shipwreck/blog-theme-minimal`, etc. Each would:
+We could ship `@nitroblog/theme-magazine`, `@nitroblog/theme-minimal`, etc. Each would:
 
 - Extend the same `--color-*` token contract
 - Provide its own Tailwind preset with different defaults
 - Possibly ship its own component overrides via the shadow pattern
 
-Sites would `npm install @shipwreck/blog-theme-magazine` and import its preset instead. Out of scope until we have 5+ sites and theming becomes a copy-paste burden.
+Sites would `npm install @nitroblog/theme-magazine` and import its preset instead. Out of scope until we have 5+ sites and theming becomes a copy-paste burden.

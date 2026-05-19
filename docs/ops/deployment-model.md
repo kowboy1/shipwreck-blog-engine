@@ -6,7 +6,7 @@ There is no production deployment of the engine itself. The engine is a library 
 
 ```
 ┌─────────────────────────────────┐
-│  shipwreck-blog-engine (repo)   │   ← engine source, library, never deployed
+│  nitroblog-ai (repo)   │   ← engine source, library, never deployed
 │  - npm packages                 │
 │  - reference template           │
 └──────────────┬──────────────────┘
@@ -15,7 +15,7 @@ There is no production deployment of the engine itself. The engine is a library 
 ┌─────────────────────────────────┐
 │  host-site-repo                 │   ← e.g. wollongong-weather
 │  ├─ index.html (host content)   │
-│  ├─ _blog/  (Astro source)      │   ← imports @shipwreck/blog-core
+│  ├─ _blog/  (Astro source)      │   ← imports @nitroblog/core
 │  ├─ blog/   (built static HTML) │   ← committed AFTER `npm run build`
 │  └─ assets/                     │
 └──────────────┬──────────────────┘

@@ -2,9 +2,9 @@
 > This file is referenced FROM the agent runbook in `AGENTS.md`, not a starting point.
 > Continue here only if `AGENTS.md` routed you to this file.
 
-# Shipwreck Blog Engine — Architecture Plan
+# NitroBlog AI — Architecture Plan
 
-**Goal:** A drop-in blog engine for any Shipwreck site, where engine updates flow to all sites via `npm update`, but content and branding stay per-site.
+**Goal:** A drop-in blog engine for any NitroSites site, where engine updates flow to all sites via `npm update`, but content and branding stay per-site.
 
 ---
 
@@ -12,7 +12,7 @@
 
 Three layers, with strict boundaries:
 
-### A) Shared engine — `@shipwreck/blog-core` (npm package)
+### A) Shared engine — `@nitroblog/core` (npm package)
 **Lives in this repo. Published to npm (or git+ssh). Updates roll out via version bumps.**
 
 - Astro components: `<PostLayout>`, `<BlogIndex>`, `<ArchivePage>`, `<PostCard>`, `<Breadcrumbs>`, `<TableOfContents>`, `<RelatedPosts>`, `<AuthorBio>`
@@ -23,7 +23,7 @@ Three layers, with strict boundaries:
 - TypeScript types
 - Utility functions (slug, reading time, related-posts ranker)
 
-### B) Shared theme — `@shipwreck/blog-theme-default` (npm package)
+### B) Shared theme — `@nitroblog/theme-default` (npm package)
 **Default visual layer. Sites can swap this for a custom theme.**
 
 - Default Tailwind theme extension
@@ -33,7 +33,7 @@ Three layers, with strict boundaries:
 ### C) Per-site template (copy-once scaffold)
 **Lives in each site's repo at `site-repo/blog/`. Copied once via scaffolder. Doesn't auto-update — but rarely needs to.**
 
-- `package.json` — depends on `@shipwreck/blog-core` + theme
+- `package.json` — depends on `@nitroblog/core` + theme
 - `astro.config.ts` — minimal, integrations wired
 - `site.config.ts` — brand, baseUrl, CTAs, OG defaults
 - `tailwind.config.ts` — extends shared preset, brand color overrides
@@ -41,7 +41,7 @@ Three layers, with strict boundaries:
 - `src/pages/` — thin re-exports of core route handlers
 - `public/` — site-specific images, OG defaults
 
-**The key insight:** the template is *thin*. 90% of the code lives in `blog-core`. The template is just config + content + glue. So `npm update @shipwreck/blog-core` actually rolls out real improvements.
+**The key insight:** the template is *thin*. 90% of the code lives in `core`. The template is just config + content + glue. So `npm update @nitroblog/core` actually rolls out real improvements.
 
 ---
 
@@ -63,9 +63,9 @@ Three layers, with strict boundaries:
 ## 3. Repo structure (this repo)
 
 ```
-shipwreck-blog-engine/
+nitroblog-ai/
 ├── packages/
-│   ├── blog-core/              # the engine
+│   ├── core/              # the engine
 │   │   ├── src/
 │   │   │   ├── components/
 │   │   │   ├── layouts/
@@ -76,10 +76,10 @@ shipwreck-blog-engine/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   ├── blog-theme-default/     # default visual theme
+│   ├── theme-default/     # default visual theme
 │   │   └── src/
 │   │
-│   └── create-shipwreck-blog/  # scaffolder CLI (Phase 2)
+│   └── create-nitroblog/  # scaffolder CLI (Phase 2)
 │       └── template/           # what gets copied into a site
 │
 ├── examples/
@@ -126,7 +126,7 @@ For React/Vite host sites that serve their own routing: blog builds independentl
 
 ## 5. Content model (Phase 1)
 
-Single Zod schema in `blog-core/src/schemas/post.ts`. Every field from the brief, all optional except the essentials:
+Single Zod schema in `core/src/schemas/post.ts`. Every field from the brief, all optional except the essentials:
 
 **Required:** `title`, `slug` (auto from filename), `publishDate`, `body`
 **SEO:** `metaTitle`, `metaDescription`, `canonical`, `noindex`, `ogTitle`, `ogDescription`, `ogImage`
@@ -144,14 +144,14 @@ Validated at build time — bad frontmatter = build fails with a clear error.
 **Definition of done: a site can `npm install` the engine, write MDX, and ship a static `/blog/` with full SEO.**
 
 - Monorepo scaffold (pnpm workspaces)
-- `blog-core` package: schema, components, layouts, SEO helpers, sitemap, RSS
-- `blog-theme-default` package: baseline styling
+- `core` package: schema, components, layouts, SEO helpers, sitemap, RSS
+- `theme-default` package: baseline styling
 - `examples/demo-site`: working reference integration
 - `INTEGRATION.md`: copy-paste setup steps
 - Manual scaffold (no CLI yet — just copy `examples/demo-site` into a real site)
 
 ### Phase 2 — Scaffolder + first real integration (target: 3–5 days)
-- `create-shipwreck-blog` CLI: `npx create-shipwreck-blog ./blog`
+- `create-nitroblog` CLI: `npx create-nitroblog ./blog`
 - Pick first real site to integrate (suggest: review-removals — most blog-hungry)
 - Document gotchas, fix what breaks
 - Versioning policy locked in (semver, changelog discipline)

@@ -48,8 +48,8 @@ For each site, on each engine release:
 
 1. **Bump engine deps** in the site's `_blog/package.json`:
    ```json
-   "@shipwreck/blog-core": "<new-version-spec>",
-   "@shipwreck/blog-theme-default": "<new-version-spec>"
+   "@nitroblog/core": "<new-version-spec>",
+   "@nitroblog/theme-default": "<new-version-spec>"
    ```
 2. **Rebuild:** `cd _blog && npm install && npm run build`
 3. **Deploy via the host's existing mechanism** — push the new `dist/` to wherever the host serves `/blog/`. Some examples:
@@ -57,7 +57,7 @@ For each site, on each engine release:
    - Host on Netlify/Vercel/GitHub Pages: same — auto-deploy picks it up
    - Host on cPanel/VPS with SSH: rsync `dist/` to `/home/<domain>/public_html/blog/`
    - Host on cheap shared cPanel without SSH: SFTP or cPanel File Manager upload
-4. **Verify:** `npx shipwreck-blog-doctor --final --phase9-confirmed --feedback-status=...`
+4. **Verify:** `npx nitroblog-doctor --final --phase9-confirmed --feedback-status=...`
 
 That's it. No central infrastructure, no daily polling, no tokens, no cron.
 
@@ -67,7 +67,7 @@ That's it. No central infrastructure, no daily polling, no tokens, no cron.
 
 Previous versions of this engine had:
 - A per-site `<site>-blog` GitHub repo
-- A `shipwreck-updater.php` cron-polled script on the host
+- A `nitroblog-updater.php` cron-polled script on the host
 - A `release-dispatch.yml` workflow on the engine repo that fired `repository_dispatch` events to N consumer repos
 - A `templates/site-blog-build.yml` that consumer repos used to build + publish releases
 
@@ -90,7 +90,7 @@ A few scripts remain for cases where they're convenient — none are required:
 
 ## Site registry
 
-`.shipwreck/sites.json` tracks which sites are running which engine version. The schema is intentionally minimal:
+`.nitroblog/sites.json` tracks which sites are running which engine version. The schema is intentionally minimal:
 
 ```json
 [
@@ -123,7 +123,7 @@ When integrating, two things to verify regardless of stack:
 
 2. **CDN cache rule for `/blog/*`** (optional, recommended if there's a CDN). Static HTML/CSS/JS, no auth, no per-user state — aggressive edge-caching is safe. Set a long edge-TTL and a long browser-TTL with cache_everything. The cache gets purged whenever the next deploy happens via the host's normal mechanism.
 
-The integration skill ([Phase 6/7](.claude/skills/integrate-shipwreck-blog.md)) walks through these.
+The integration skill ([Phase 6/7](.claude/skills/integrate-nitroblog.md)) walks through these.
 
 ---
 

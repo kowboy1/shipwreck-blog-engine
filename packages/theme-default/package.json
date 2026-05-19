@@ -1,0 +1,24 @@
+{
+  "name": "@nitroblog/theme-default",
+  "version": "0.5.0",
+  "description": "Default Tailwind preset and theme tokens for NitroBlog AI",
+  "type": "module",
+  "main": "./tailwind-preset.js",
+  "exports": {
+    ".": {
+      "types": "./tailwind-preset.d.ts",
+      "default": "./tailwind-preset.js"
+    },
+    "./tailwind-preset": {
+      "types": "./tailwind-preset.d.ts",
+      "default": "./tailwind-preset.js"
+    },
+    "./tokens.css": "./tokens.css"
+  },
+  "types": "./tailwind-preset.d.ts",
+  "files": [
+    "tailwind-preset.js",
+    "tailwind-preset.d.ts",
+    "tokens.css"
+  ]
+}

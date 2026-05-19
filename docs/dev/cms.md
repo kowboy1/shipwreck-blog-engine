@@ -91,8 +91,8 @@ Sveltia supports three auth flows for the GitHub backend:
 Modern, secure, no backend needed. Requires registering a GitHub OAuth App once (org-level, reused across all sites):
 
 1. Visit https://github.com/settings/developers → New OAuth App
-2. Application name: "Shipwreck CMS"
-3. Homepage URL: any (e.g. https://shipwreckstudio.com)
+2. Application name: "NitroBlog CMS"
+3. Homepage URL: any (e.g. https://nitrosites.example)
 4. Authorization callback URL: `https://api.netlify.com/auth/done` (Sveltia's default; or self-host)
 5. Save the Client ID; Sveltia uses PKCE so no client secret needed in the browser
 6. Add the Client ID to each site's `config.yml` under `backend`:
@@ -151,7 +151,7 @@ Each site has its own `/blog/admin/`. There's no "one CMS dashboard for all site
 Pros: per-site isolation, no central server, simple ops.
 Cons: editor has to log into each site separately.
 
-If we ever need a unified dashboard, it'd be a separate project (`shipwreck-cms-dashboard`) that aggregates posts from each site's `/blog/posts.json` and links out to each site's admin for editing. Out of scope for now.
+If we ever need a unified dashboard, it'd be a separate project (`nitroblog-cms-dashboard`) that aggregates posts from each site's `/blog/posts.json` and links out to each site's admin for editing. Out of scope for now.
 
 ## What Sveltia can't do
 

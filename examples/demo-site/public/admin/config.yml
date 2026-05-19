@@ -18,10 +18,10 @@ backend:
 # Branding on the login screen + chrome.
 # - logo_url: shown on the login screen. Pre-resized to 400px wide / 187px tall
 #   PNG (40 KB) so Sveltia displays it at the intended size without runtime CSS
-#   overrides. Replace the file at public/admin/shipwreck-blog-engine-logo.png
+#   overrides. Replace the file at public/admin/nitroblog-ai-logo.png
 #   to rebrand per-site.
 # - site_url / display_url further down — set per site.
-logo_url: shipwreck-blog-engine-logo.png
+logo_url: nitroblog-ai-logo.png
 
 # Where Sveltia uploads images. Path is relative to the site repo root.
 media_folder: "public/uploads"

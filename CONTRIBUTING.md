@@ -4,13 +4,13 @@
 
 # Contributing
 
-How to work on the Shipwreck Blog Engine.
+How to work on the NitroBlog AI.
 
 ## Setup
 
 ```bash
-git clone git@github.com:YOUR_ORG/shipwreck-blog-engine.git
-cd shipwreck-blog-engine
+git clone git@github.com:YOUR_ORG/nitroblog-ai.git
+cd nitroblog-ai
 npm install
 npm run dev
 # opens http://localhost:4321/blog/
@@ -22,9 +22,9 @@ Node 20+ required.
 
 ```
 packages/
-  blog-core/             # @shipwreck/blog-core — schemas, components, SEO, utils
-  blog-theme-default/    # @shipwreck/blog-theme-default — Tailwind preset, tokens
-  create-shipwreck-blog/ # scaffolder CLI
+  core/             # @nitroblog/core — schemas, components, SEO, utils
+  theme-default/    # @nitroblog/theme-default — Tailwind preset, tokens
+  create-nitroblog/ # scaffolder CLI
 
 examples/
   demo-site/             # reference Astro app (also serves as the per-site template)
@@ -34,11 +34,11 @@ examples/
 
 | Adding... | Goes in |
 |---|---|
-| A new SEO field on posts | `packages/blog-core/src/schemas/post.ts` |
-| A new schema.org generator | `packages/blog-core/src/seo/schema-org.ts` |
-| A reusable visual component | `packages/blog-core/src/components/` |
+| A new SEO field on posts | `packages/core/src/schemas/post.ts` |
+| A new schema.org generator | `packages/core/src/seo/schema-org.ts` |
+| A reusable visual component | `packages/core/src/components/` |
 | A site-specific component | `examples/demo-site/src/components/` (and document the pattern) |
-| A theme token | `packages/blog-theme-default/tokens.css` + the Tailwind preset |
+| A theme token | `packages/theme-default/tokens.css` + the Tailwind preset |
 | A new page route | `examples/demo-site/src/pages/` |
 | A new CTA | `examples/demo-site/src/components/cta/` and register in `registry.ts` |
 | A redirect | `examples/demo-site/src/redirects.json` |
@@ -75,7 +75,7 @@ One-off handover docs (briefs for a specific job) ARE allowed to be specific —
 
 ## Release hygiene checklist (run before tagging any release)
 
-The OpenClaw-side runtime skill (`~/.openclaw/skills/shipwreck-final-gate/SKILL.md`) and workspace AGENTS.md rule are NOT auto-synced with engine releases. They live at the agent runtime layer and are intentionally stable across many engine bumps — they only need updating when the **completion contract** itself changes.
+The OpenClaw-side runtime skill (`~/.openclaw/skills/nitroblog-final-gate/SKILL.md`) and workspace AGENTS.md rule are NOT auto-synced with engine releases. They live at the agent runtime layer and are intentionally stable across many engine bumps — they only need updating when the **completion contract** itself changes.
 
 Before tagging a release, answer:
 
@@ -85,9 +85,9 @@ Before tagging a release, answer:
    - Did `print-completion`'s stdout format change in a way the runtime layer needs to know about?
    - Did the meaning of "done" change (e.g., new required phase or attestation)?
 2. If **yes** to any of the above:
-   - Bump `COMPLETION_CONTRACT_VERSION` at the top of `packages/blog-core/bin/doctor.mjs`
+   - Bump `COMPLETION_CONTRACT_VERSION` at the top of `packages/core/bin/doctor.mjs`
    - Note the contract bump prominently in the CHANGELOG entry
-   - Send a heads-up to whoever maintains the OpenClaw-side runtime files (typically the user — they manually update `~/.openclaw/workspace/AGENTS.md` and `~/.openclaw/skills/shipwreck-final-gate/SKILL.md` to reference the new contract version)
+   - Send a heads-up to whoever maintains the OpenClaw-side runtime files (typically the user — they manually update `~/.openclaw/workspace/AGENTS.md` and `~/.openclaw/skills/nitroblog-final-gate/SKILL.md` to reference the new contract version)
 3. If **no** (most releases):
    - Leave `COMPLETION_CONTRACT_VERSION` alone
    - Runtime layer needs no changes

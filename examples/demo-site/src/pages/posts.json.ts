@@ -1,5 +1,5 @@
 import { getCollection } from "astro:content"
-import { buildPostsManifest } from "@shipwreck/blog-core"
+import { buildPostsManifest } from "@nitroblog/core"
 import siteConfig from "../../site.config"
 import type { APIContext } from "astro"
 

@@ -1,6 +1,6 @@
 # Reference: Post frontmatter
 
-Every `.mdx` file in `_blog/src/content/posts/` has YAML frontmatter validated by `postSchema` in `@shipwreck/blog-core`. The `id` of a post is its filename without extension.
+Every `.mdx` file in `_blog/src/content/posts/` has YAML frontmatter validated by `postSchema` in `@nitroblog/core`. The `id` of a post is its filename without extension.
 
 ## Required fields
 

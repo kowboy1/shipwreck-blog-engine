@@ -55,9 +55,9 @@ echo "Bumping $CURRENT → $NEW"
 # Update all workspace package.json files
 PKGS=(
   "package.json"
-  "packages/blog-core/package.json"
-  "packages/blog-theme-default/package.json"
-  "packages/create-shipwreck-blog/package.json"
+  "packages/core/package.json"
+  "packages/theme-default/package.json"
+  "packages/create-nitroblog/package.json"
   "examples/demo-site/package.json"
 )
 

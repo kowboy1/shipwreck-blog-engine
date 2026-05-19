@@ -1,0 +1,197 @@
+---
+/**
+ * Engine-side post page renderer. Renders everything inside `<BaseLayout>`:
+ * breadcrumbs, the 3-column ArticleLayout (sticky ToC, article body with
+ * header/byline/excerpt/hero/content/tags/AuthorBio, sticky CTA aside),
+ * and the bottom "More articles" grid.
+ *
+ * Per-site `[...slug].astro` is a thin wrapper that:
+ *   1. defines getStaticPaths()
+ *   2. awaits preparePostPageData(...)
+ *   3. wraps <PostPage> in its <BaseLayout>
+ *
+ * That means engine fixes to the article rendering ship through
+ * `npm update` instead of requiring a per-site patch.
+ */
+import { ClientRouter } from "astro:transitions"
+import type { PostPageData } from "./preparePostPageData.js"
+import type { SiteConfig } from "../schemas/site.js"
+import ArticleLayout from "../components/ArticleLayout.astro"
+import Breadcrumbs from "../components/Breadcrumbs.astro"
+import TableOfContents from "../components/TableOfContents.astro"
+import RelatedPosts from "../components/RelatedPosts.astro"
+import AuthorBio from "../components/AuthorBio.astro"
+import AuthorAvatar from "../components/AuthorAvatar.astro"
+import TagList from "../components/TagList.astro"
+import CTABlock from "../components/CTABlock.astro"
+import PopularPosts from "../components/PopularPosts.astro"
+import ResponsivePicture from "../components/ResponsivePicture.astro"
+
+interface Props {
+  data: PostPageData
+  siteConfig: SiteConfig
+  /**
+   * Map of CTA slug -> Astro component used by `<CTABlock>`. Each consumer
+   * site exports its own registry from `_blog/src/components/cta/registry.ts`.
+   */
+  ctaRegistry: Record<string, unknown>
+}
+
+const { data, siteConfig, ctaRegistry } = Astro.props
+const { post, Content, headings, authors, readingLabel, bottomGridPosts, popularPosts, popularSource, popularWindow, crumbs } = data
+const sidebarPopular = siteConfig.sidebar?.popular ?? { enabled: true, limit: 5, heading: "Popular articles" }
+const showPopular = sidebarPopular.enabled !== false && popularPosts.length > 0
+
+// Hero image only renders when the post explicitly sets one (no OG-image fallback).
+const heroImage = post.data.featuredImage
+const layout = siteConfig.layout ?? {}
+---
+
+<ClientRouter />
+
+<a href="#nitroblog-main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-button focus:bg-bg-elevated focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary focus:shadow-card focus:outline focus:outline-2 focus:outline-accent">
+  Skip to article
+</a>
+
+<div id="nitroblog-main" class="mx-auto max-w-7xl">
+  <Breadcrumbs items={crumbs} />
+
+  <ArticleLayout>
+    {layout.showTableOfContents && (
+      <TableOfContents
+        slot="toc"
+        headings={headings}
+        sticky
+        maxDepth={4}
+        title="Table of contents"
+      />
+    )}
+
+    <aside slot="aside" class="space-y-6 lg:sticky lg:top-24">
+      <CTABlock
+        siteConfig={siteConfig}
+        category={post.data.category}
+        postOverride={post.data.ctaBlock}
+        registry={ctaRegistry}
+      />
+      {showPopular && (
+        <PopularPosts
+          posts={popularPosts}
+          basePath={siteConfig.blogBasePath}
+          heading={sidebarPopular.heading ?? "Popular articles"}
+          fallbackImage={siteConfig.cards?.fallbackImage}
+          windowLabel={popularSource === "popularity-file" ? popularWindow : undefined}
+        />
+      )}
+    </aside>
+
+    <article>
+      <header class="not-prose mb-8">
+        <h1 class="font-heading text-4xl font-bold text-primary md:text-5xl">
+          {post.data.title}
+        </h1>
+
+        {layout.showAuthor && authors.length > 0 && (
+          <div class="mt-5 flex items-center gap-3">
+            <div class="flex -space-x-2">
+              {authors.map(({ data: a }) => (
+                <AuthorAvatar
+                  author={a}
+                  size={40}
+                  fallbackImage={siteConfig.seo.defaultAuthorAvatar}
+                  class="ring-2 ring-bg"
+                />
+              ))}
+            </div>
+            <div class="text-sm">
+              <p class="text-text">
+                {authors.map(({ id, data: a }, i) => (
+                  <>
+                    {i > 0 && <span class="text-muted/60"> &amp; </span>}
+                    <a
+                      href={`${siteConfig.blogBasePath}/authors/${id}/`}
+                      class="font-semibold hover:text-accent"
+                    >
+                      {a.name}
+                    </a>
+                  </>
+                ))}
+              </p>
+              <p class="text-muted">
+                <time datetime={post.data.publishDate.toISOString()}>
+                  {post.data.publishDate.toLocaleDateString("en-AU", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </time>
+                {layout.showReadingTime && readingLabel && (
+                  <> · {readingLabel}</>
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {(!layout.showAuthor || authors.length === 0) && (
+          <p class="mt-4 text-sm text-muted">
+            <time datetime={post.data.publishDate.toISOString()}>
+              {post.data.publishDate.toLocaleDateString("en-AU", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </time>
+            {layout.showReadingTime && readingLabel && <> · {readingLabel}</>}
+          </p>
+        )}
+
+        {post.data.excerpt && (
+          <p class="mt-4 text-lg text-muted">{post.data.excerpt}</p>
+        )}
+
+        {heroImage && (
+          <ResponsivePicture
+            src={heroImage}
+            alt={post.data.featuredImageAlt ?? post.data.title}
+            width={post.data.featuredImageWidth ?? 1200}
+            height={post.data.featuredImageHeight ?? 675}
+            decoding="async"
+            fetchpriority="high"
+            avif={post.data.featuredImageAvif}
+            webp={post.data.featuredImageWebp}
+            srcset={post.data.featuredImageSrcset}
+            sizes="(min-width: 1024px) 720px, 100vw"
+            class="mt-8 aspect-[16/9] w-full rounded-card object-cover"
+          />
+        )}
+      </header>
+
+      <div class="prose prose-lg max-w-none">
+        <Content />
+      </div>
+
+      {post.data.tags && post.data.tags.length > 0 && (
+        <div class="mt-10 border-t border-border pt-6">
+          <TagList tags={post.data.tags} basePath={siteConfig.blogBasePath} />
+        </div>
+      )}
+
+      {authors.map(({ id, data: author }) => (
+        <AuthorBio
+          author={author}
+          href={`${siteConfig.blogBasePath}/authors/${id}/`}
+          fallbackImage={siteConfig.seo.defaultAuthorAvatar}
+        />
+      ))}
+    </article>
+
+    <RelatedPosts
+      posts={bottomGridPosts}
+      basePath={siteConfig.blogBasePath}
+      title="More articles"
+      layout="grid"
+      fallbackImage={siteConfig.cards?.fallbackImage}
+    />
+  </ArticleLayout>
+</div>

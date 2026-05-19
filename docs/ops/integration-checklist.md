@@ -15,7 +15,7 @@ If using the scaffolder CLI:
 
 ```bash
 cd <host-site-repo>
-npx create-shipwreck-blog ./_blog
+npx create-nitroblog ./_blog
 ```
 
 If scaffolding manually (recommended while engine has no GitHub remote):
@@ -23,7 +23,7 @@ If scaffolding manually (recommended while engine has no GitHub remote):
 ```bash
 cd <host-site-repo>
 rsync -a --exclude=node_modules --exclude=.astro --exclude=dist \
-  /home/rick/projects/shipwreck-blog-engine/examples/demo-site/ ./_blog/
+  /home/rick/projects/nitroblog-ai/examples/demo-site/ ./_blog/
 ```
 
 - [ ] `_blog/` directory exists in the host site repo
@@ -31,13 +31,13 @@ rsync -a --exclude=node_modules --exclude=.astro --exclude=dist \
 
 ## Step 2 — Wire engine dependencies
 
-Edit `_blog/package.json` so `@shipwreck/blog-core` and `@shipwreck/blog-theme-default` resolve. Three options:
+Edit `_blog/package.json` so `@nitroblog/core` and `@nitroblog/theme-default` resolve. Three options:
 
 | Option | When | How |
 |---|---|---|
-| `file:` path | Local dev when engine is in a sibling folder | `"@shipwreck/blog-core": "file:../../shipwreck-blog-engine/packages/blog-core"` |
-| Git tag | Production after engine has a GitHub remote | `"@shipwreck/blog-core": "git+ssh://git@github.com:YOUR_ORG/shipwreck-blog-engine.git#v0.1.0&workspace=@shipwreck/blog-core"` |
-| Git branch | Pre-release, dev branch | `"@shipwreck/blog-core": "git+ssh://git@github.com:YOUR_ORG/shipwreck-blog-engine.git#main&workspace=@shipwreck/blog-core"` |
+| `file:` path | Local dev when engine is in a sibling folder | `"@nitroblog/core": "file:../../nitroblog-ai/packages/core"` |
+| Git tag | Production after engine has a GitHub remote | `"@nitroblog/core": "git+ssh://git@github.com:YOUR_ORG/nitroblog-ai.git#v0.1.0&workspace=@nitroblog/core"` |
+| Git branch | Pre-release, dev branch | `"@nitroblog/core": "git+ssh://git@github.com:YOUR_ORG/nitroblog-ai.git#main&workspace=@nitroblog/core"` |
 
 - [ ] Engine deps resolve when running `npm install` in `_blog/`
 

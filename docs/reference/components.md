@@ -1,10 +1,10 @@
 # Reference: Components
 
-Every Astro component exported from `@shipwreck/blog-core/components/`. Import paths follow the pattern:
+Every Astro component exported from `@nitroblog/core/components/`. Import paths follow the pattern:
 
 ```astro
 ---
-import Breadcrumbs from "@shipwreck/blog-core/components/Breadcrumbs.astro"
+import Breadcrumbs from "@nitroblog/core/components/Breadcrumbs.astro"
 ---
 ```
 
@@ -283,7 +283,7 @@ Resolution order: `postOverride` → `categoryOverrides[category]` → `default`
 
 ## Adding a new component
 
-1. Create `packages/blog-core/src/components/MyComponent.astro`
+1. Create `packages/core/src/components/MyComponent.astro`
 2. Add it to `examples/demo-site/` to prove it works end-to-end
 3. Add an entry here in `docs/reference/components.md`
 4. Add an entry in `CHANGELOG.md` `[Unreleased]` → `Added`

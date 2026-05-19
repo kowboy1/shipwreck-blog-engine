@@ -1,6 +1,6 @@
 {
-  "name": "@shipwreck/blog-demo-site",
-  "version": "0.4.1",
+  "name": "@nitroblog/demo-site",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,11 +8,11 @@
     "build": "astro build",
     "preview": "astro preview",
     "typecheck": "astro check",
-    "doctor": "shipwreck-blog-doctor"
+    "doctor": "nitroblog-doctor"
   },
   "dependencies": {
-    "@shipwreck/blog-core": "file:../../packages/blog-core",
-    "@shipwreck/blog-theme-default": "file:../../packages/blog-theme-default",
+    "@nitroblog/core": "file:../../packages/core",
+    "@nitroblog/theme-default": "file:../../packages/theme-default",
     "@astrojs/mdx": "^4.0.0",
     "@astrojs/rss": "^4.0.0",
     "@astrojs/sitemap": "^3.2.0",

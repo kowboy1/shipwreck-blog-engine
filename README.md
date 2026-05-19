@@ -1,4 +1,4 @@
-# Shipwreck Blog Engine
+# NitroBlog AI
 
 A drop-in, SEO-first, hosting-agnostic static blog engine. Built on Astro + MDX. Designed to install onto **any** static-file-serving host: cheap shared cPanel, OpenLiteSpeed/CyberPanel, dedicated VPS, Cloudflare Pages, Netlify, Vercel, S3+CloudFront, raw nginx — anything.
 
@@ -31,9 +31,9 @@ Opens the demo site at http://localhost:4321/blog.
 
 ```
 packages/
-  blog-core/             # @shipwreck/blog-core — schemas, SEO helpers, components, page renderers, doctor preflight
-  blog-theme-default/    # @shipwreck/blog-theme-default — Tailwind preset + tokens
-  create-shipwreck-blog/ # CLI scaffolder
+  core/             # @nitroblog/core — schemas, SEO helpers, components, page renderers, doctor preflight
+  theme-default/    # @nitroblog/theme-default — Tailwind preset + tokens
+  create-nitroblog/ # CLI scaffolder
 
 examples/
   demo-site/             # reference integration (also the template per-site repos copy from)
@@ -41,7 +41,7 @@ examples/
 scripts/                 # universal updater, installer, push-deploy, theme extractor, visual diff
 templates/               # per-site CI workflow template
 .claude/skills/          # agent runbooks (integration, add-post, stack-notes)
-.shipwreck/sites.json    # site registry (every blog deployment)
+.nitroblog/sites.json    # site registry (every blog deployment)
 
 docs/                    # architecture, content model, ops, theming reference
 ```
@@ -57,7 +57,7 @@ docs/                    # architecture, content model, ops, theming reference
 - [CONTRIBUTING.md](CONTRIBUTING.md) — fixing bugs, adding features in the engine
 - [CHANGELOG.md](CHANGELOG.md) — release history
 - [UPGRADE-GUIDE.md](UPGRADE-GUIDE.md) — moving sites between engine versions
-- [packages/blog-theme-default/TOKEN-CONTRACT.md](packages/blog-theme-default/TOKEN-CONTRACT.md) — canonical theming token list
+- [packages/theme-default/TOKEN-CONTRACT.md](packages/theme-default/TOKEN-CONTRACT.md) — canonical theming token list
 
 ### What ships in the engine
 
@@ -71,8 +71,8 @@ A compact summary — for the full catalogue with file paths see [FEATURES.md](F
 - **Performance** — image dimension autodetect (SVG / PNG / JPEG), explicit `width`/`height` on every image, `decoding="async"`, `fetchpriority="high"` on heroes, `<picture>` opt-in for AVIF/WebP/srcset, inline-stylesheets auto
 - **Accessibility** — skip-to-content link, ARIA on filters, `prefers-reduced-motion` honoured, `<details>` keyboard accessible
 - **Authoring** — Sveltia CMS pre-wired at `/blog/admin/`, remark plugin auto-strips/downgrades stray body H1s, `seed-posts` doctor subcommand with bundled placeholder hero
-- **Mandatory heroes** — `featuredImage` required by default; engine ships hero generation flow (`shipwreck-blog-doctor heroes` + per-site `.shipwreck/art-direction.json`)
-- **Popular articles widget** — sidebar mini-card list; consumes `.shipwreck/popularity.json` (reference Cloudflare Web Analytics producer included), recency fallback when no data
+- **Mandatory heroes** — `featuredImage` required by default; engine ships hero generation flow (`nitroblog-doctor heroes` + per-site `.nitroblog/art-direction.json`)
+- **Popular articles widget** — sidebar mini-card list; consumes `.nitroblog/popularity.json` (reference Cloudflare Web Analytics producer included), recency fallback when no data
 - **Doctor** — preflight + closeout gate with state-file attestations, completion-contract versioning, image-sitemap freshness, sentinel CSS class checks, multi-H1 guard, hero-policy enforcement
 
 ### Status

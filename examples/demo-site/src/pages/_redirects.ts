@@ -1,5 +1,5 @@
 import type { APIContext } from "astro"
-import { redirectsSchema } from "@shipwreck/blog-core"
+import { redirectsSchema } from "@nitroblog/core"
 import data from "../redirects.json"
 
 export const prerender = true

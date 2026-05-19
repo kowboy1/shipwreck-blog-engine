@@ -1,9 +1,9 @@
 # Reference: SiteConfig
 
-The shape of `_blog/site.config.ts` in a host site. Validated by `siteConfigSchema` in `@shipwreck/blog-core`.
+The shape of `_blog/site.config.ts` in a host site. Validated by `siteConfigSchema` in `@nitroblog/core`.
 
 ```ts
-import type { SiteConfig } from "@shipwreck/blog-core"
+import type { SiteConfig } from "@nitroblog/core"
 
 const config: SiteConfig = { /* ... */ }
 export default config
@@ -70,7 +70,7 @@ Resolution order, highest priority first:
 ## Full example
 
 ```ts
-import type { SiteConfig } from "@shipwreck/blog-core"
+import type { SiteConfig } from "@nitroblog/core"
 
 const config: SiteConfig = {
   siteName: "Wollongong Weather",

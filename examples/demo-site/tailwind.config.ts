@@ -1,5 +1,5 @@
 import type { Config } from "tailwindcss"
-import sharedPreset from "@shipwreck/blog-theme-default/tailwind-preset"
+import sharedPreset from "@nitroblog/theme-default/tailwind-preset"
 import typography from "@tailwindcss/typography"
 import { dirname, join } from "node:path"
 import { createRequire } from "node:module"
@@ -10,7 +10,7 @@ import { createRequire } from "node:module"
 // relative path. This is the canonical pattern — don't replace with hand-
 // written ../paths even if it "looks simpler".
 const require_ = createRequire(import.meta.url)
-const enginePkgRoot = dirname(require_.resolve("@shipwreck/blog-core/package.json"))
+const enginePkgRoot = dirname(require_.resolve("@nitroblog/core/package.json"))
 
 export default {
   presets: [sharedPreset],

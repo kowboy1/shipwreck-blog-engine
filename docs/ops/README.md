@@ -1,8 +1,8 @@
-# Operator overview — Shipwreck Blog Engine
+# Operator overview — NitroBlog AI
 
 **Audience:** Nyxi (primary), and any human ops administrator.
 
-This document is the entry point for understanding the operational footprint of the Shipwreck Blog Engine. Read this first before touching anything related to it on a server.
+This document is the entry point for understanding the operational footprint of the NitroBlog AI. Read this first before touching anything related to it on a server.
 
 ## TL;DR
 
@@ -18,12 +18,12 @@ Three packages and a template:
 
 | Package | Role |
 |---|---|
-| `@shipwreck/blog-core` | npm package — schemas, SEO helpers, Astro components, utilities |
-| `@shipwreck/blog-theme-default` | npm package — Tailwind preset + CSS-var tokens |
-| `create-shipwreck-blog` | npm CLI — scaffolds a `_blog/` folder into a host site |
+| `@nitroblog/core` | npm package — schemas, SEO helpers, Astro components, utilities |
+| `@nitroblog/theme-default` | npm package — Tailwind preset + CSS-var tokens |
+| `create-nitroblog` | npm CLI — scaffolds a `_blog/` folder into a host site |
 | `examples/demo-site` | Reference Astro app — copied into host sites as their per-site `_blog/` |
 
-A site that "uses the engine" has a folder like `host-site-repo/_blog/` containing a copy of the template, with `package.json` declaring `@shipwreck/blog-core` as a dependency. Build it = `astro build` produces static HTML, which gets copied into `host-site-repo/blog/` for the web server to serve.
+A site that "uses the engine" has a folder like `host-site-repo/_blog/` containing a copy of the template, with `package.json` declaring `@nitroblog/core` as a dependency. Build it = `astro build` produces static HTML, which gets copied into `host-site-repo/blog/` for the web server to serve.
 
 ## What this means for you (Nyxi)
 
@@ -44,7 +44,7 @@ For each site that should adopt the update:
 
 ```bash
 cd <host-site-repo>/_blog
-npm update @shipwreck/blog-core @shipwreck/blog-theme-default
+npm update @nitroblog/core @nitroblog/theme-default
 npm run build
 git add ../blog && git commit -m "chore(blog): update engine to vX.Y.Z" && git push
 ```
@@ -59,7 +59,7 @@ See [incident-runbook.md](./incident-runbook.md). Common causes: dependency drif
 
 ### The engine repo
 
-`/home/rick/projects/shipwreck-blog-engine` (RGB-Skank dev box). When pushed, it lives at the GitHub repo to be created (TBC).
+`/home/rick/projects/nitroblog-ai` (RGB-Skank dev box). When pushed, it lives at the GitHub repo to be created (TBC).
 
 ### Docs
 
@@ -88,7 +88,7 @@ These are locked, documented in `ARCHITECTURE.md` at the engine root:
 
 ## Glossary
 
-- **Engine** — this repo (`shipwreck-blog-engine`). Source of truth for blog logic, components, and schemas.
+- **Engine** — this repo (`nitroblog-ai`). Source of truth for blog logic, components, and schemas.
 - **Host site** — a site that consumes the engine (Wollongong Weather, Review Removals).
 - **Blog source** — the `_blog/` folder in a host site repo. The Astro project.
 - **Blog output** — the `blog/` folder in a host site repo. Built static HTML.

@@ -16,7 +16,7 @@ This file is the canonical entry point for any agent (Claude/Codex/Nyxi/OpenClaw
 2. **READ THIS FILE COMPLETELY** before opening any other file.
 3. **Identify your job from the table below**, then follow ONLY the runbook it points to, phase-by-phase, in order.
 4. **DO NOT skip phases** in the runbook. Each phase has a precondition (must be true to start) and a done-check (must be true to finish). If a precondition fails, return to the previous phase. If a done-check fails, the phase is not done.
-5. **DO NOT declare "done" until** you have run `npx shipwreck-blog-doctor --final --phase9-confirmed --feedback-status=<provided|none-needed>` AND it reports zero fatal issues. Default `npm run doctor` is the gate for Phases 1-8; `--final` is the gate for "integration complete."
+5. **DO NOT declare "done" until** you have run `npx nitroblog-doctor --final --phase9-confirmed --feedback-status=<provided|none-needed>` AND it reports zero fatal issues. Default `npm run doctor` is the gate for Phases 1-8; `--final` is the gate for "integration complete."
 
 If you skip any of the above, you will produce a half-broken integration that we will have to throw away and redo. We've been there. Don't repeat it.
 
@@ -26,11 +26,11 @@ If you skip any of the above, you will produce a half-broken integration that we
 
 | If you've been told to… | Read this next, follow it phase-by-phase |
 |---|---|
-| Install the blog engine on a site (any site, any host, any stack) | [.claude/skills/integrate-shipwreck-blog.md](.claude/skills/integrate-shipwreck-blog.md) |
-| Add, write, or publish a blog post on a site that already has the engine | [.claude/skills/add-shipwreck-blog-post.md](.claude/skills/add-shipwreck-blog-post.md) |
-| Theme an already-installed blog (change colours/fonts/buttons to match a host) | [packages/blog-theme-default/TOKEN-CONTRACT.md](packages/blog-theme-default/TOKEN-CONTRACT.md) — fill every token, then rebuild |
+| Install the blog engine on a site (any site, any host, any stack) | [.claude/skills/integrate-nitroblog.md](.claude/skills/integrate-nitroblog.md) |
+| Add, write, or publish a blog post on a site that already has the engine | [.claude/skills/add-nitroblog-post.md](.claude/skills/add-nitroblog-post.md) |
+| Theme an already-installed blog (change colours/fonts/buttons to match a host) | [packages/theme-default/TOKEN-CONTRACT.md](packages/theme-default/TOKEN-CONTRACT.md) — fill every token, then rebuild |
 | Push a fresh build of an existing site's blog (when we have SSH) | [scripts/deploy-blog.mjs](scripts/deploy-blog.mjs) — convenience helper, not load-bearing |
-| Diagnose why a recently-integrated site looks broken | Run `npx shipwreck-blog-doctor` first. Then [.claude/skills/integrate-shipwreck-blog.md](.claude/skills/integrate-shipwreck-blog.md) → "Common failure modes" table |
+| Diagnose why a recently-integrated site looks broken | Run `npx nitroblog-doctor` first. Then [.claude/skills/integrate-nitroblog.md](.claude/skills/integrate-nitroblog.md) → "Common failure modes" table |
 | Understand how the engine propagates updates to all sites | [ROLLOUT.md](ROLLOUT.md) |
 | Fix a bug or ship a feature in the engine itself | [CONTRIBUTING.md](CONTRIBUTING.md) + [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Anything not on this list | STOP. Ask the user to clarify before improvising. |
@@ -68,15 +68,15 @@ Bump the patch component (last decimal) only. `0.3.1 → 0.3.2 → 0.3.3 → ...
 
 - **Site domain, server, document root, deploy method:** look up in the user's agent dashboard (Harbour Control, or whatever the user maintains for site→server mapping); ask the user if no dashboard access.
 - **CDN zone IDs / API tokens:** check the user's secret store; never guess credentials.
-- **GitHub org / repo names:** ask the user, or read existing entries in `.shipwreck/sites.json`.
+- **GitHub org / repo names:** ask the user, or read existing entries in `.nitroblog/sites.json`.
 
 ### 5. The site registry is the source of truth
 
-Every site running the engine is recorded in [.shipwreck/sites.json](.shipwreck/sites.json) with its domain, deploy method, server, source repo, CDN config, engine version. After integrating a new site, append it there. Before working on an existing site, read its entry there for context.
+Every site running the engine is recorded in [.nitroblog/sites.json](.nitroblog/sites.json) with its domain, deploy method, server, source repo, CDN config, engine version. After integrating a new site, append it there. Before working on an existing site, read its entry there for context.
 
 ### 6. `npm run doctor` is the gate
 
-Every consumer site has `npm run doctor` available (provided by `@shipwreck/blog-core`'s bin). It runs preflight + post-install checks: file: deps resolve, tokens.css exists, SiteShell is customised, build succeeds, CSS contains all engine classes, source/deploy paths are separate.
+Every consumer site has `npm run doctor` available (provided by `@nitroblog/core`'s bin). It runs preflight + post-install checks: file: deps resolve, tokens.css exists, SiteShell is customised, build succeeds, CSS contains all engine classes, source/deploy paths are separate.
 
 **Run it after `npm install` (catches install bugs early). Run it again before declaring done (catches skipped phases).** A run with any "fatal" finding means you cannot declare done.
 
@@ -87,7 +87,7 @@ Every consumer site has `npm run doctor` available (provided by `@shipwreck/blog
 After you believe the job is complete, before reporting completion:
 
 1. **Run `npm run doctor`** in the consumer site dir. All checks must pass (no `✗` items). If any fail, the job isn't done — go back and finish.
-2. **Update [.shipwreck/sites.json](.shipwreck/sites.json)** with the relevant entry (engine version, last deployed, etc.)
+2. **Update [.nitroblog/sites.json](.nitroblog/sites.json)** with the relevant entry (engine version, last deployed, etc.)
 3. **Engine feedback:** if you discovered something the dev agent should fix in the engine itself, write a `FEEDBACK-FOR-CLAUDE-<job>.md` at the engine repo root AND tell the user. If you have no engine feedback, tell the user explicitly: "no engine feedback this run."
 4. **Stack-specific quirks:** if you saw stack-specific quirks worth recording (anything different from a "vanilla" install on this stack), write a session log following the template in [.claude/skills/stack-notes/README.md](.claude/skills/stack-notes/README.md) AND tell the user.
 5. **Phase 9 questions** (only on integration jobs): ask the user the post-install integration questions before declaring done — see the integration skill's Phase 9.

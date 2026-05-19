@@ -1,4 +1,4 @@
-# Developer overview — Shipwreck Blog Engine
+# Developer overview — NitroBlog AI
 
 **Audience:** anyone working on the engine itself (humans or AI agents).
 
@@ -8,25 +8,25 @@ This is the entry point for contributors. Read [VERSIONING.md](../VERSIONING.md)
 
 A monorepo containing:
 
-- An npm package (`@shipwreck/blog-core`) with all reusable schemas, SEO helpers, components, and utilities
-- An npm package (`@shipwreck/blog-theme-default`) with default Tailwind preset + tokens
-- A scaffolder CLI (`create-shipwreck-blog`)
+- An npm package (`@nitroblog/core`) with all reusable schemas, SEO helpers, components, and utilities
+- An npm package (`@nitroblog/theme-default`) with default Tailwind preset + tokens
+- A scaffolder CLI (`create-nitroblog`)
 - A reference Astro app (`examples/demo-site`) that exists for two reasons: (1) end-to-end testing, (2) the source-of-truth template that gets copied into host sites
 
 ## Repo layout
 
 ```
-shipwreck-blog-engine/
+nitroblog-ai/
 ├── packages/
-│   ├── blog-core/                    # main library
+│   ├── core/                    # main library
 │   │   └── src/
 │   │       ├── schemas/              # Zod content schemas
 │   │       ├── seo/                  # schema.org + meta tag builders
 │   │       ├── utils/                # reading-time, slug, related, internal-links
 │   │       ├── components/           # Astro components (consumed by sites)
 │   │       └── index.ts              # public API
-│   ├── blog-theme-default/           # Tailwind preset + tokens
-│   └── create-shipwreck-blog/        # scaffolder CLI
+│   ├── theme-default/           # Tailwind preset + tokens
+│   └── create-nitroblog/        # scaffolder CLI
 ├── examples/
 │   └── demo-site/                    # reference Astro app
 ├── docs/                             # YOU ARE HERE
@@ -52,14 +52,14 @@ shipwreck-blog-engine/
        │ depends on
        ▼
 ┌──────────────────────────────────────┐
-│   @shipwreck/blog-theme-default      │   ← style layer
+│   @nitroblog/theme-default      │   ← style layer
 │   - Tailwind preset                  │
 │   - tokens.css                       │
 └──────┬───────────────────────────────┘
        │
        ▼
 ┌──────────────────────────────────────┐
-│   @shipwreck/blog-core               │   ← logic layer (the engine)
+│   @nitroblog/core               │   ← logic layer (the engine)
 │   - schemas (Post, SiteConfig, ...)  │
 │   - seo (schema.org, meta tags)      │
 │   - utils (related, slug, ToC...)    │
@@ -73,13 +73,13 @@ The split matters: schemas and utils are the *contract*. Components are the *def
 
 ```bash
 git clone <engine-repo>
-cd shipwreck-blog-engine
+cd nitroblog-ai
 npm install
 npm run dev
 # opens http://localhost:4321/blog/
 ```
 
-`npm run dev` starts Astro pointing at `examples/demo-site/`. Editing any file in `packages/blog-core/src/` hot-reloads in the demo site (workspace symlinks).
+`npm run dev` starts Astro pointing at `examples/demo-site/`. Editing any file in `packages/core/src/` hot-reloads in the demo site (workspace symlinks).
 
 ### Common scripts
 
@@ -99,7 +99,7 @@ npm run dev
 
 ### Component conventions
 
-Astro components in `packages/blog-core/src/components/`:
+Astro components in `packages/core/src/components/`:
 
 - One concern per file
 - Take props for everything that varies; no internal hardcoded paths
@@ -109,7 +109,7 @@ Astro components in `packages/blog-core/src/components/`:
 
 ### Schema conventions
 
-Zod schemas in `packages/blog-core/src/schemas/`:
+Zod schemas in `packages/core/src/schemas/`:
 
 - Required fields are first, optional second
 - Optional fields with sensible defaults use `.default(...)` rather than just `.optional()`
@@ -120,8 +120,8 @@ Zod schemas in `packages/blog-core/src/schemas/`:
 
 1. Decide which layer it belongs in (see "How the layers fit together")
 2. If it's a new schema field: add to schema with default/optional, update Sveltia config in demo, update reference docs
-3. If it's a new component: add to `packages/blog-core/src/components/`, export from `index.ts`, add to `docs/reference/components.md`
-4. If it's a new utility: add to `packages/blog-core/src/utils/`, export, document
+3. If it's a new component: add to `packages/core/src/components/`, export from `index.ts`, add to `docs/reference/components.md`
+4. If it's a new utility: add to `packages/core/src/utils/`, export, document
 5. Update `examples/demo-site/` to use the new feature (proves it works end-to-end)
 6. Update CHANGELOG `[Unreleased]`
 7. Bump version + commit (see [VERSIONING.md](../VERSIONING.md))
@@ -129,7 +129,7 @@ Zod schemas in `packages/blog-core/src/schemas/`:
 ### What NOT to add
 
 - A backend / database / admin server
-- Per-site logic in `blog-core` (that's the host site's job)
+- Per-site logic in `core` (that's the host site's job)
 - Mandatory dependencies. Optional integrations OK; required ones need a strong case.
 - Comments explaining the obvious. Prefer self-documenting code.
 

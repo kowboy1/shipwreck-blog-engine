@@ -1,4 +1,4 @@
-import type { SiteConfig } from "@shipwreck/blog-core"
+import type { SiteConfig } from "@nitroblog/core"
 
 const config: SiteConfig = {
   siteName: "Demo Site",

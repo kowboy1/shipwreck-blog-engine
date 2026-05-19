@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * refresh-popularity.mjs — fetch blog post pageviews from Cloudflare Web
- * Analytics and write <site-repo>/.shipwreck/popularity.json for the engine
+ * Analytics and write <site-repo>/.nitroblog/popularity.json for the engine
  * sidebar widget to consume.
  *
  * Run from a per-site repo. Reads env vars (recommend a per-site .env file
@@ -16,7 +16,7 @@
  *   BLOG_BASE_PATH     — defaults to "/blog/" — only URLs under this prefix
  *                        are counted
  *   WINDOW_DAYS        — defaults to 30
- *   OUTPUT_PATH        — defaults to ".shipwreck/popularity.json" (relative
+ *   OUTPUT_PATH        — defaults to ".nitroblog/popularity.json" (relative
  *                        to the script's CWD — i.e. the site repo root)
  *
  * Usage:
@@ -27,7 +27,7 @@
  *
  *   # nightly via cron (host machine):
  *   0 2 * * * cd /path/to/site-repo && node scripts/refresh-popularity.mjs \
- *     >> /var/log/shipwreck-popularity.log 2>&1
+ *     >> /var/log/nitroblog-popularity.log 2>&1
  *
  *   # GitHub Actions: see docs section in README.
  *
@@ -57,7 +57,7 @@ const ACCOUNT_TAG = process.env.CF_ACCOUNT_TAG
 const SITE_TAG = process.env.CF_WEB_ANALYTICS_SITE_TAG
 const BLOG_BASE_PATH = (process.env.BLOG_BASE_PATH ?? "/blog/").replace(/\/?$/, "/")
 const WINDOW_DAYS = parseInt(process.env.WINDOW_DAYS ?? "30", 10)
-const OUTPUT_PATH = process.env.OUTPUT_PATH ?? ".shipwreck/popularity.json"
+const OUTPUT_PATH = process.env.OUTPUT_PATH ?? ".nitroblog/popularity.json"
 const LIMIT = parseInt(process.env.LIMIT ?? "50", 10)
 
 const now = new Date()

@@ -2,10 +2,10 @@
 > This file is referenced FROM the agent runbook in `AGENTS.md`, not a starting point.
 > Continue here only if `AGENTS.md` routed you to this file.
 
-# Shipwreck Blog Engine — Project Brief
+# NitroBlog AI — Project Brief
 
 ## Purpose
-Build a fast, lightweight, SEO-first standalone blogging platform that can be dropped into existing and future Shipwreck/ Rick web projects instead of using WordPress.
+Build a fast, lightweight, SEO-first standalone blogging platform that can be dropped into existing and future NitroSites/Rick web projects instead of using WordPress.
 
 This document captures the relevant conversation and decisions so another agent (including Claude Code / designer agents) can pick up the work cold.
 
@@ -22,7 +22,7 @@ A local audit of projects under `/home/rick/projects` found:
   - **Vite**
   - **Tailwind CSS 4**
 - Static brochure/microsites are mostly plain **HTML/CSS/JS**.
-- Internal dashboards use a **Node HTTP server + shared Shipwreck dashboard shell** pattern.
+- Internal dashboards use a **Node HTTP server + shared NitroSites dashboard shell** pattern.
 
 ### 2) Standard stack recommendation for future builds
 Recommended house stack for future web app/page builds:
@@ -36,7 +36,7 @@ Recommended house stack for future web app/page builds:
 - **Framer Motion** only when needed
 - **Vitest + Testing Library**
 - **Node + Express** for backend/internal tools
-- Use the **Shipwreck dashboard shell** for internal admin/dashboard surfaces
+- Use the **NitroSites dashboard shell** for internal admin/dashboard surfaces
 
 Blunt recommendation:
 
@@ -326,13 +326,13 @@ This project directory should become the home for:
 ---
 
 ## Suggested Working Name
-- **Shipwreck Blog Engine**
+- **NitroBlog AI**
 
 Alternatives that may be worth exploring later:
-- Shipwreck Content Engine
-- Shipwreck SEO Publisher
-- Shipwreck Blog Core
-- Shipwreck Headless Blog
+- NitroBlog Content Engine
+- NitroBlog SEO Publisher
+- NitroBlog AI Core
+- NitroBlog Headless
 
 ---
 

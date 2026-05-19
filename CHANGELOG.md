@@ -4,9 +4,74 @@
 
 # Changelog
 
-All notable changes to the Shipwreck Blog Engine. Format: [Keep a Changelog](https://keepachangelog.com). Versioning: [SemVer](https://semver.org).
+All notable changes to NitroBlog AI (the project formerly known as the Shipwreck Blog Engine through 0.4.1). Format: [Keep a Changelog](https://keepachangelog.com). Versioning: [SemVer](https://semver.org).
+
+Historical entries below 0.5.0 retain the old "Shipwreck Blog Engine" name verbatim as a record of what was true at the time.
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-05-19
+
+Full rebrand: **Shipwreck Blog Engine → NitroBlog AI**, mirroring the NitroCore AI naming convention. This is a breaking change — every consumer site must reinstall from scratch.
+
+### Why the rename
+
+The project sits alongside NitroCore AI as a sibling NitroSites property. "Shipwreck Blog Engine" carried legacy company branding that doesn't reflect the current product identity (a drop-in `/blog/*` engine designed to coexist symbiotically with NitroCore-built sites). Aligning the names makes the relationship between the two engines self-evident.
+
+### Breaking changes
+
+| Old | New |
+|---|---|
+| `@shipwreck/blog-core` | `@nitroblog/core` |
+| `@shipwreck/blog-theme-default` | `@nitroblog/theme-default` |
+| `create-shipwreck-blog` (CLI scaffolder) | `create-nitroblog` |
+| `shipwreck-blog-doctor` (bin) | `nitroblog-doctor` |
+| `shipwreckBlog()` (Astro integration fn) | `nitroblog()` |
+| `ShipwreckBlogOptions` (TS interface) | `NitroBlogOptions` |
+| `.shipwreck/sites.json` (registry) | `.nitroblog/sites.json` |
+| `.shipwreck-integration-state.json` (doctor state) | `.nitroblog-integration-state.json` |
+| `.shipwreck-site.json` (per-site marker) | `.nitroblog-site.json` |
+| DOM IDs: `#shipwreck-card-grid`, `#shipwreck-blog-filters`, `#shipwreck-search`, `#shipwreck-load-more`, `#shipwreck-main` etc. | `#nitroblog-card-grid`, `#nitroblog-filters`, `#nitroblog-search`, `#nitroblog-load-more`, `#nitroblog-main` |
+| `packages/blog-core/` (dir) | `packages/core/` |
+| `packages/blog-theme-default/` (dir) | `packages/theme-default/` |
+| `packages/create-shipwreck-blog/` (dir) | `packages/create-nitroblog/` |
+| Repo: `shipwreck-blog-engine` | `nitroblog-ai` (will be renamed on GitHub separately) |
+
+### Migration
+
+There is no in-place upgrade path. The rename touches the npm package name, binary name, integration function name, config directory, state files, and DOM identifiers — anything that was wired to "shipwreck" needs to be re-wired to "nitroblog". Per project policy at this stage of the lifecycle (no production sites with the old name still online), the migration plan is **delete the old `_blog/` directory in the consumer site and run `create-nitroblog` fresh**.
+
+Wollongong Weather's existing blog will be nuked and re-installed under the new identifiers. No other production consumers exist.
+
+### Coexistence with NitroCore AI
+
+The cross-engine partition shipped in NitroCore v1.1.4 → v1.1.30 is unchanged. NitroCore still owns `Organization` / `WebSite` / `LocalBusiness` / `Product` / `Service` JSON-LD sitewide and auto-skips emission on `/blog/*`. NitroBlog AI still owns `Article` / `CollectionPage` / `FAQPage` / `Speakable` / `HowTo` on `/blog/*`. The `seo.emitOrganizationSchema` / `seo.emitWebsiteSchema` opt-out flags are unchanged — NitroCore's scaffolder sets both to `false` when mounting NitroBlog AI under a NitroCore site.
+
+### Added: GEO field contract documentation
+
+[FEATURES.md](FEATURES.md) §6 now includes a "GEO field contract" subsection listing the exact field names, JSON-LD output shape, and emission paths for `abstract`, `about[]`, `mentions[]`, `license`, `isAccessibleForFree`. This is the canonical reference for keeping NitroCore's `<SEO>` / `*Schema` components and NitroBlog's `articleSchema()` in lockstep. When Schema.org adds a new GEO-relevant field, the rule is: update this section first, then implement in both engines.
+
+We considered extracting a shared `@nitroblog/schema` package to enforce alignment at code level. Decision: not yet warranted. The actual drift surface is small (the partition prevents same-page overlap of `Organization`/`WebSite`; the only field-level overlap is the GEO primitives listed above). A documented contract is lighter than a third package and accomplishes the anti-drift goal until/unless a third consumer of these builders appears.
+
+### Not changed
+
+- All Schema.org / SEO / GEO emission behaviour
+- All accessibility primitives
+- All listing UX
+- All doctor preflight / closeout-gate semantics
+- All performance defaults
+- The hosting-agnostic deployment posture
+
+### Migration
+
+Consumer-side (every site, including Wollongong Weather):
+
+```bash
+# In the host site repo:
+rm -rf _blog
+npx create-nitroblog _blog
+# follow scaffold prompts, re-theme, re-import any posts that survived the rebrand
+```
 
 ## [0.4.1] - 2026-05-13
 

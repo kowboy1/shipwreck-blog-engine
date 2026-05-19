@@ -1,0 +1,19 @@
+{
+  "name": "create-nitroblog",
+  "version": "0.5.0",
+  "description": "Scaffold a NitroBlog AI install into an existing site",
+  "type": "module",
+  "bin": {
+    "create-nitroblog": "./bin/create.mjs"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "dependencies": {
+    "prompts": "^2.4.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -24,7 +24,7 @@ This guide is written for both humans and agents. It covers two phases:
 
 ```bash
 cd <host-site-repo>
-cp -r <path-to>/shipwreck-blog-engine/examples/demo-site ./blog
+cp -r <path-to>/nitroblog-ai/examples/demo-site ./blog
 cd blog
 npm install
 ```
@@ -97,7 +97,7 @@ Find the host site's color palette, fonts, and spacing. Sources to check, in ord
 Copy the relevant values into `blog/tailwind.config.ts`:
 
 ```ts
-import sharedPreset from "@shipwreck/blog-theme-default/tailwind-preset"
+import sharedPreset from "@nitroblog/theme-default/tailwind-preset"
 
 export default {
   presets: [sharedPreset],
@@ -132,7 +132,7 @@ And if the host site uses CSS custom properties for theming, mirror them in `blo
 
 ### Step 3 — Load the host site's fonts
 
-If the host site loads fonts via Google Fonts, a self-hosted file, or a `<link>` tag in `<head>`, add the same loader to `blog/src/layouts/BaseLayout.astro` (or the equivalent in `blog-core`).
+If the host site loads fonts via Google Fonts, a self-hosted file, or a `<link>` tag in `<head>`, add the same loader to `blog/src/layouts/BaseLayout.astro` (or the equivalent in `core`).
 
 ### Step 4 — Visual diff
 
@@ -169,11 +169,11 @@ Mount `blog/dist/` at `/blog/` on the host. Three common patterns:
 
 ## Part 3 — Updating the engine across sites
 
-When `@shipwreck/blog-core` ships a fix or feature:
+When `@nitroblog/core` ships a fix or feature:
 
 ```bash
 cd <host-site-repo>/blog
-npm update @shipwreck/blog-core
+npm update @nitroblog/core
 npm run build
 ```
 
@@ -223,7 +223,7 @@ display_url: https://yoursite.com/blog
 Two helpers ship with the engine:
 
 - **`/blog/posts.json`** — every site exposes a JSON manifest of published posts (id, title, url, tags, category, dates). Hand this to Nyxi when asking it to add internal links to a post.
-- **`suggestInternalLinks()`** — exported from `@shipwreck/blog-core`. Programmatic version of the same logic, used by build-time scripts or future admin tooling.
+- **`suggestInternalLinks()`** — exported from `@nitroblog/core`. Programmatic version of the same logic, used by build-time scripts or future admin tooling.
 
 ### Commits look like
 ```
@@ -242,7 +242,7 @@ Edit `blog/src/components/cta/` — add a new `.astro` component, register it in
 
 ### Override a core component
 
-Astro supports component shadowing. Create the same path under `blog/src/components/` and Astro uses your local version. Useful for one-off tweaks; if it generalizes, land the change in `blog-core` instead.
+Astro supports component shadowing. Create the same path under `blog/src/components/` and Astro uses your local version. Useful for one-off tweaks; if it generalizes, land the change in `core` instead.
 
 ### Add a custom page (e.g., "About the blog")
 

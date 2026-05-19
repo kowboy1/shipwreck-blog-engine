@@ -18,7 +18,7 @@ on:
       - "packages/**"
       - "examples/demo-site/**"
       - "scripts/test-integration.sh"
-      - "scripts/shipwreck-updater.php"
+      - "scripts/nitroblog-updater.php"
       - ".github/workflows/integration-test.yml"
   push:
     branches: [main, master]

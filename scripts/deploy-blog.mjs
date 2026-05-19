@@ -12,7 +12,7 @@
  *   node scripts/deploy-blog.mjs --site <site-name> --dry-run
  *   node scripts/deploy-blog.mjs --all
  *
- * Reads from .shipwreck/sites.json. For each site with deploy.method === "rsync"
+ * Reads from .nitroblog/sites.json. For each site with deploy.method === "rsync"
  * (or sftp/ftp), runs:
  *   1. Build the blog locally  (cd <localPath>/<blogSourcePath> && npm install && npm run build)
  *   2. Optional: scripts/visual-diff.mjs against pinned goldens
@@ -23,7 +23,7 @@
  * NOTE: this is the "push-style" deploy used when we have SSH/SFTP into the
  * host. For hosts where we DON'T have shell access (most cheap shared cPanel,
  * any client-owned server), sites pull updates themselves via
- * shipwreck-updater.php (see scripts/shipwreck-updater.php). The pull model
+ * nitroblog-updater.php (see scripts/nitroblog-updater.php). The pull model
  * is the universal default; this script is for the faster push path when
  * available.
  *
@@ -41,9 +41,9 @@ import process from "node:process"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const REPO_ROOT = join(__dirname, "..")
-const SITES_FILE = join(REPO_ROOT, ".shipwreck", "sites.json")
+const SITES_FILE = join(REPO_ROOT, ".nitroblog", "sites.json")
 const ENGINE_VERSION = JSON.parse(
-  await readFile(join(REPO_ROOT, "packages", "blog-core", "package.json"), "utf8"),
+  await readFile(join(REPO_ROOT, "packages", "core", "package.json"), "utf8"),
 ).version
 
 // ---------- args ----------

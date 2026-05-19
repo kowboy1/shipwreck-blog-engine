@@ -33,7 +33,7 @@ This is the "how does it actually work" doc. Read [README.md](./README.md) first
 
 ## Package boundaries
 
-### `@shipwreck/blog-core`
+### `@nitroblog/core`
 
 **What it owns:**
 - The Zod schemas (Post, Author, SiteConfig, Redirects). These are the contract between sites and the engine.
@@ -47,15 +47,15 @@ This is the "how does it actually work" doc. Read [README.md](./README.md) first
 - Auth (no admin)
 - Routing (that's Astro's pages folder, owned by the demo-site / per-site templates)
 
-### `@shipwreck/blog-theme-default`
+### `@nitroblog/theme-default`
 
 **What it owns:**
 - Tailwind preset (CSS-var-driven theme tokens)
 - `tokens.css` with default values
 - The token contract: variable names that components expect to exist
 
-**Why it's separate from blog-core:**
-- Lets sites swap the theme without forking blog-core
+**Why it's separate from core:**
+- Lets sites swap the theme without forking core
 - Lets us ship multiple themes later without breaking the API
 - Keeps the logic layer free of CSS
 
@@ -70,7 +70,7 @@ This is the "how does it actually work" doc. Read [README.md](./README.md) first
 - Test the engine programmatically (no automated tests yet)
 - Ship as an npm package (it's a workspace member, not a publishable artifact)
 
-### `create-shipwreck-blog`
+### `create-nitroblog`
 
 **What it is:**
 - A small Node CLI that copies `examples/demo-site/` into a target directory
@@ -83,7 +83,7 @@ This is the "how does it actually work" doc. Read [README.md](./README.md) first
 Astro lets host sites override engine components by placing a same-named file at the same path. Engine ships:
 
 ```
-node_modules/@shipwreck/blog-core/src/components/Breadcrumbs.astro
+node_modules/@nitroblog/core/src/components/Breadcrumbs.astro
 ```
 
 Host site can shadow:
@@ -105,7 +105,7 @@ The blog index/post pages render through `BaseLayout.astro`, which wraps content
 
 ```
 <body>
-  <Header />     ← per-site SiteShell/Header.astro (NOT in blog-core)
+  <Header />     ← per-site SiteShell/Header.astro (NOT in core)
   <main>...</main>
   <Footer />     ← per-site SiteShell/Footer.astro
 </body>

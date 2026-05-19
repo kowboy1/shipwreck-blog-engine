@@ -1,6 +1,6 @@
 # Stack-Specific Notes
 
-The [integrate-shipwreck-blog](../integrate-shipwreck-blog.md) skill is **universal** — it works on any stack that can serve static files. But every stack has its own quirks (where `.htaccess` lives, whether SSH is enabled at which tier, how cron is scheduled in the control panel, what the docroot path looks like, etc.).
+The [integrate-nitroblog](../integrate-nitroblog.md) skill is **universal** — it works on any stack that can serve static files. But every stack has its own quirks (where `.htaccess` lives, whether SSH is enabled at which tier, how cron is scheduled in the control panel, what the docroot path looks like, etc.).
 
 As we integrate the blog into real-world hosts, we capture stack-specific quirks here so future integrations on the same stack benefit immediately instead of rediscovering the same gotchas.
 
@@ -17,7 +17,7 @@ While running an integration on a stack we haven't seen before, **log gotchas as
 When you finish an integration on a new stack, save a session log at:
 
 ```
-D:/NyXi's Vault/Sessions/YYYY-MM-DD-<your-name>-shipwreck-blog-integration-<stack-name>.md
+D:/NyXi's Vault/Sessions/YYYY-MM-DD-<your-name>-nitroblog-integration-<stack-name>.md
 ```
 
 Following this shape:
@@ -25,12 +25,12 @@ Following this shape:
 ```markdown
 ---
 date: YYYY-MM-DD
-project: shipwreck-blog-engine
-tags: [session-log, shipwreck-blog-engine, integration, stack-<stack-name>]
+project: nitroblog-ai
+tags: [session-log, nitroblog-ai, integration, stack-<stack-name>]
 source: claude-code
 ---
 
-# Session: Shipwreck Blog Integration on <stack-name> — <YYYY-MM-DD>
+# Session: NitroBlog AI Integration on <stack-name> — <YYYY-MM-DD>
 
 ## Stack identity
 - Control panel / OS / webserver / PHP version / SSH availability

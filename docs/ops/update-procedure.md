@@ -14,7 +14,7 @@ When the engine ships a new version, each consuming site has to opt in. This doc
 cd <host-site-repo>/_blog
 
 # 1. Update the engine packages
-npm update @shipwreck/blog-core @shipwreck/blog-theme-default
+npm update @nitroblog/core @nitroblog/theme-default
 
 # 2. Verify the lockfile changed
 git diff package-lock.json | head

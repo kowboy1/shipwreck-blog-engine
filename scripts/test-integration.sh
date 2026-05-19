@@ -4,7 +4,7 @@
 # Simulates the canonical sibling-repo install path in a clean tmp dir:
 #
 #   <tmp>/sites/
-#     shipwreck-blog-engine/   <- symlink to this repo
+#     nitroblog-ai/   <- symlink to this repo
 #     test-site-blog/          <- copy of demo-site, file: deps adjusted
 #
 # Then runs the actual integration sequence (install, build, doctor, dist
@@ -36,7 +36,7 @@ for arg in "$@"; do
 done
 
 ENGINE_REPO="$(cd "$(dirname "$0")/.." && pwd)"
-TMP_ROOT="$(mktemp -d -t shipwreck-integration-test-XXXXXXXX)"
+TMP_ROOT="$(mktemp -d -t nitroblog-integration-test-XXXXXXXX)"
 SITES_DIR="$TMP_ROOT/sites"
 TEST_SITE="$SITES_DIR/test-site-blog"
 
@@ -62,13 +62,13 @@ fail() { echo "  ✗ $1"; FAIL_COUNT=$((FAIL_COUNT+1)); }
 # ---------- 1. Set up sibling layout ----------
 
 echo
-echo "=== shipwreck blog engine — integration acceptance test ==="
+echo "=== NitroBlog AI — integration acceptance test ==="
 echo "Engine: $ENGINE_REPO"
 echo "Tmp:    $TMP_ROOT"
 echo
 
 mkdir -p "$SITES_DIR"
-ln -s "$ENGINE_REPO" "$SITES_DIR/shipwreck-blog-engine"
+ln -s "$ENGINE_REPO" "$SITES_DIR/nitroblog-ai"
 
 # Copy demo-site as the per-site source (the canonical install motion)
 cp -r "$ENGINE_REPO/examples/demo-site/." "$TEST_SITE/"
@@ -77,10 +77,10 @@ ok "Sibling layout created: $TEST_SITE alongside engine"
 # ---------- 2. Adjust file: dep paths for the sibling layout ----------
 
 # Demo-site ships with file:../../packages/... (works in monorepo). For a
-# sibling-of-engine layout, the path becomes ../shipwreck-blog-engine/packages/...
-sed -i 's|file:../../packages/|file:../shipwreck-blog-engine/packages/|g' "$TEST_SITE/package.json"
+# sibling-of-engine layout, the path becomes ../nitroblog-ai/packages/...
+sed -i 's|file:../../packages/|file:../nitroblog-ai/packages/|g' "$TEST_SITE/package.json"
 
-if grep -q 'file:../shipwreck-blog-engine/packages/blog-core' "$TEST_SITE/package.json"; then
+if grep -q 'file:../nitroblog-ai/packages/core' "$TEST_SITE/package.json"; then
   ok "file: dep paths adjusted for sibling layout"
 else
   fail "file: dep paths NOT updated correctly"
@@ -98,11 +98,11 @@ else
 fi
 
 # Symlinks resolve?
-if [[ -e node_modules/@shipwreck/blog-core/package.json ]]; then
+if [[ -e node_modules/@nitroblog/core/package.json ]]; then
   ok "Engine package symlinks resolve (file: deps not broken)"
 else
   fail "Engine package symlinks BROKEN — file: dep path is wrong (extra ../ probably)"
-  ls -la node_modules/@shipwreck/ 2>&1 | head -5
+  ls -la node_modules/@nitroblog/ 2>&1 | head -5
   exit 1
 fi
 
@@ -139,7 +139,7 @@ for path in \
   dist/robots.txt \
   dist/admin/index.html \
   dist/admin/config.yml \
-  dist/admin/shipwreck-blog-engine-logo.png
+  dist/admin/nitroblog-ai-logo.png
 do
   if [[ -e "$path" ]]; then
     ok "dist contains: $path"
@@ -427,12 +427,12 @@ else
 fi
 
 # v0.4.0: skip-to-content link emitted from engine pages
-if grep -q 'href="#shipwreck-main"' "$POST_HTML"; then
+if grep -q 'href="#nitroblog-main"' "$POST_HTML"; then
   ok "Post page renders skip-to-content link (accessibility)"
 else
   fail "Post page MISSING skip-to-content link"
 fi
-if grep -q 'href="#shipwreck-main"' "$INDEX_HTML"; then
+if grep -q 'href="#nitroblog-main"' "$INDEX_HTML"; then
   ok "Index page renders skip-to-content link"
 else
   fail "Index page MISSING skip-to-content link"
@@ -456,17 +456,17 @@ fi
 
 # v0.3.13: /blog/ index has the filter sidebar + embedded manifest
 INDEX_HTML="$TEST_SITE/dist/index.html"
-if grep -q 'id="shipwreck-blog-filters"' "$INDEX_HTML"; then
+if grep -q 'id="nitroblog-filters"' "$INDEX_HTML"; then
   ok "/blog/ index renders BlogFilters sidebar"
 else
   fail "/blog/ index MISSING BlogFilters sidebar"
 fi
-if grep -q 'id="shipwreck-posts-manifest"' "$INDEX_HTML" && grep -q '"hello-world"' "$INDEX_HTML"; then
+if grep -q 'id="nitroblog-posts-manifest"' "$INDEX_HTML" && grep -q '"hello-world"' "$INDEX_HTML"; then
   ok "/blog/ index embeds the posts manifest script tag"
 else
   fail "/blog/ index MISSING embedded posts manifest"
 fi
-if grep -q 'id="shipwreck-search"' "$INDEX_HTML"; then
+if grep -q 'id="nitroblog-search"' "$INDEX_HTML"; then
   ok "BlogFilters renders the search input"
 else
   fail "BlogFilters MISSING search input"
@@ -481,7 +481,7 @@ fi
 # generated more than 1 page; with 3 demo posts + postsPerPage=10 it's a single
 # page, so this assertion is skipped when page/2/ doesn't exist.
 if [[ -f "$TEST_SITE/dist/page/2/index.html" ]]; then
-  if grep -q 'id="shipwreck-blog-filters"' "$TEST_SITE/dist/page/2/index.html"; then
+  if grep -q 'id="nitroblog-filters"' "$TEST_SITE/dist/page/2/index.html"; then
     fail "Paginated /blog/page/2/ should NOT render BlogFilters sidebar"
   else
     ok "Paginated index correctly omits BlogFilters sidebar"
@@ -500,7 +500,7 @@ fi
 # values and breaks Phase 2 work silently. This bit wollongong-weather's
 # first integration — never let it back in.
 GLOBAL_CSS="$TEST_SITE/src/styles/global.css"
-if grep -q '@import.*@shipwreck/blog-theme-default/tokens\.css' "$GLOBAL_CSS"; then
+if grep -q '@import.*@nitroblog/theme-default/tokens\.css' "$GLOBAL_CSS"; then
   fail "global.css imports engine tokens.css (cascade-order bug — would override consumer values)"
 else
   ok "global.css does not import engine tokens.css (cascade order correct)"
@@ -583,19 +583,19 @@ else
 fi
 
 # attest-* subcommands write to state file
-TEST_STATE_DIR=$(mktemp -d -t shipwreck-attest-test-XXXX)
-cp "$TEST_SITE/node_modules/.bin/shipwreck-blog-doctor" "$TEST_STATE_DIR/" 2>/dev/null || true
+TEST_STATE_DIR=$(mktemp -d -t nitroblog-attest-test-XXXX)
+cp "$TEST_SITE/node_modules/.bin/nitroblog-doctor" "$TEST_STATE_DIR/" 2>/dev/null || true
 cd "$TEST_STATE_DIR"
-node "$ENGINE_REPO/packages/blog-core/bin/doctor.mjs" attest-phase9 '{"latest3Callout":"no","rssFooterLink":"no","gscSubmission":"no","crossLinks":"none","sveltiaCMS":"no"}' > /dev/null 2>&1
-node "$ENGINE_REPO/packages/blog-core/bin/doctor.mjs" attest-feedback none-needed "Integration test fixture; no real feedback" > /dev/null 2>&1
-node "$ENGINE_REPO/packages/blog-core/bin/doctor.mjs" attest-nav-link declined > /dev/null 2>&1
-if [[ -f "$TEST_STATE_DIR/.shipwreck-integration-state.json" ]]; then
-  ok "attest-* subcommands write to .shipwreck-integration-state.json"
+node "$ENGINE_REPO/packages/core/bin/doctor.mjs" attest-phase9 '{"latest3Callout":"no","rssFooterLink":"no","gscSubmission":"no","crossLinks":"none","sveltiaCMS":"no"}' > /dev/null 2>&1
+node "$ENGINE_REPO/packages/core/bin/doctor.mjs" attest-feedback none-needed "Integration test fixture; no real feedback" > /dev/null 2>&1
+node "$ENGINE_REPO/packages/core/bin/doctor.mjs" attest-nav-link declined > /dev/null 2>&1
+if [[ -f "$TEST_STATE_DIR/.nitroblog-integration-state.json" ]]; then
+  ok "attest-* subcommands write to .nitroblog-integration-state.json"
 else
   fail "attest-* subcommands did NOT create state file"
 fi
 # Verify state file has all three attestations
-STATE=$(cat "$TEST_STATE_DIR/.shipwreck-integration-state.json")
+STATE=$(cat "$TEST_STATE_DIR/.nitroblog-integration-state.json")
 if echo "$STATE" | grep -q '"asked": true' && \
    echo "$STATE" | grep -q '"status": "none-needed"' && \
    echo "$STATE" | grep -q '"decision": "declined"'; then
@@ -652,7 +652,7 @@ tags: ["test"]
 
 Body.
 MDX
-HEROES_JSON=$(node "$ENGINE_REPO/packages/blog-core/bin/doctor.mjs" heroes --json 2>&1 || true)
+HEROES_JSON=$(node "$ENGINE_REPO/packages/core/bin/doctor.mjs" heroes --json 2>&1 || true)
 if echo "$HEROES_JSON" | grep -q '"slug": "no-hero-test"'; then
   ok "Doctor heroes --json subcommand reports missing-hero posts"
 else
